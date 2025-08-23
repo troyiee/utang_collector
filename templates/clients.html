@@ -1,0 +1,2760 @@
+{% extends "base.html" %}
+
+{% block title %}Client Management - Debt Collection System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="margin: 40px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+            <div>
+                <h1 style="font-size: 42px; margin-bottom: 10px;">
+                    <span style="background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        <i class="fas fa-users"></i> Client Management
+                    </span>
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 18px;">Manage your client profiles and payment tracking</p>
+            </div>
+            
+            <button id="addClientBtn" class="btn btn-primary" style="padding: 15px 30px;">
+                <i class="fas fa-plus"></i> Add New Client
+            </button>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="glass-card">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+            <div class="search-box" style="flex: 1; min-width: 0;">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="searchInput" class="form-control" placeholder="Search clients by name, phone, or products...">
+            </div>
+            
+            <div class="data-filters">
+                <button class="filter-btn active" data-filter="all">All Clients</button>
+                <button class="filter-btn" data-filter="overdue">Overdue</button>
+                <button class="filter-btn" data-filter="due-today">Due Today</button>
+                <button class="filter-btn" data-filter="due-soon">Due Soon</button>
+                <button class="filter-btn" data-filter="paid">Fully Paid</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients Table -->
+    <div class="glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-table"></i> Client Database
+            </h2>
+            <div style="color: var(--text-secondary);">
+                <span id="clientCount">{{ clients|length if clients else 0 }}</span> clients total
+            </div>
+        </div>
+
+        <div class="table-responsive" style="overflow-x: auto;">
+            <table class="table table-mobile" id="clientsTable">
+                <thead>
+                    <tr>
+                        <th scope="col">Client</th>
+                        <th scope="col">Contact Info</th>
+                        <th scope="col">Products/Items</th>
+                        <th scope="col">Financial Summary</th>
+                        <th scope="col">Due Date</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if clients %}
+                        {% for client in clients %}
+                        <tr data-client-id="{{ client.id }}" data-due-date="{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else '' }}" data-balance="{{ client.remaining_balance }}">
+                            <td data-label="Client">
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
+                                        {{ client.name[0].upper() if client.name else 'U' }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 16px;">{{ client.name }}</div>
+                                        <div style="color: var(--text-secondary); font-size: 12px;">Client ID: #{{ client.id }}</div>
+                                        <div style="color: var(--text-secondary); font-size: 12px;">Added: {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else 'N/A' }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Contact Info">
+                                <div style="line-height: 1.6;">
+                                    {% if client.phone %}
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <i class="fas fa-phone" style="color: var(--text-secondary); width: 12px;"></i>
+                                        <span style="font-size: 14px;">{{ client.phone }}</span>
+                                    </div>
+                                    {% else %}
+                                    <div style="color: var(--text-secondary); font-size: 12px; font-style: italic;">No phone provided</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td data-label="Products/Items">
+                                <div style="max-width: 250px;">
+                                    <div style="font-weight: 500; margin-bottom: 5px;">Products/Items:</div>
+                                    <div style="background: var(--glass-bg); padding: 10px; border-radius: 8px; border-left: 3px solid var(--primary-gradient);">
+                                        <p style="margin: 0; font-size: 14px; line-height: 1.4;">{{ client.products }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Financial Summary">
+                                <div style="text-align: center;">
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 2px;">Total Amount</div>
+                                        <div style="font-weight: 600; font-size: 16px;">P{{ "%.2f"|format(client.total_amount) }}</div>
+                                    </div>
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 2px;">Outstanding</div>
+                                        <div class="amount-outstanding {% if client.remaining_balance > 0 %}amount-due{% else %}amount-paid{% endif %}">P{{ "%.2f"|format(client.remaining_balance) }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="progress-outer">
+                                            {% set progress = ((client.total_amount - client.remaining_balance) / client.total_amount * 100) if client.total_amount > 0 else 100 %}
+                                            <div class="progress-inner {% if progress == 100 %}progress-complete{% else %}progress-active{% endif %}" data-progress="{{ "%.1f"|format(progress) }}"></div>
+                                        </div>
+                                        <div style="color: var(--text-secondary); font-size: 11px;">{{ "%.1f"|format(progress) }}% paid</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Due Date">
+                                <div style="text-align: center;">
+                                    <div style="font-weight: 600; margin-bottom: 5px;">{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else 'N/A' }}</div>
+                                    <div style="color: var(--text-secondary); font-size: 12px;">
+                                        {% if client.due_date %}
+                                            {% if client.days_diff < 0 %}
+                                                {{ (-client.days_diff) }} days overdue
+                                            {% elif client.days_diff == 0 %}
+                                                Due today
+                                            {% elif client.days_diff == 1 %}
+                                                Due tomorrow
+                                            {% else %}
+                                                {{ client.days_diff }} days remaining
+                                            {% endif %}
+                                        {% else %}
+                                            No due date set
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Status">
+                                <div class="client-status" data-due-date="{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else '' }}" data-balance="{{ client.remaining_balance }}">
+                                    <!-- Status will be set by JavaScript -->
+                                </div>
+                            </td>
+                            <td data-label="Actions">
+                                <div class="action-row">
+                                    <button onclick="editClientFromButton(this)" class="btn btn-primary btn-compact" title="Edit Client">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    
+                                    {% if client.remaining_balance > 0 %}
+                                    <button onclick="sendReminderFromButton(this)" class="btn btn-warning-gradient btn-compact" title="Send Email Reminder">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                    
+                                    <!-- Fixed SMS Button -->
+                                    {% if client.phone and client.phone.strip() != '' %}
+                                    <button onclick="sendSMSReminderFromButton(this)" class="btn btn-sms btn-compact" title="Send FREE SMS to {{ client.phone }}">
+                                        <i class="fas fa-sms"></i> SMS
+                                    </button>
+                                    {% else %}
+                                    <button disabled class="btn btn-disabled btn-compact" title="No phone number">
+                                        <i class="fas fa-phone-slash"></i> No SMS
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <button onclick='markAsPaidFromButton(this)' class="btn btn-success btn-compact" title="Mark as Paid">
+                                        <i class="fas fa-check-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                    
+                                    <button onclick='deleteClientFromButton(this)' class="btn btn-danger btn-compact" title="Delete Client">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                     {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if not clients %}
+        <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
+            <i class="fas fa-users" style="font-size: 64px; margin-bottom: 20px; opacity: 0.3;"></i>
+            <h3 style="margin-bottom: 15px;">No clients found</h3>
+            <p style="margin-bottom: 30px;">Start by adding your first client to track their payments and send reminders.</p>
+            <button onclick="document.getElementById('addClientBtn').click()" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Your First Client
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add/Edit Client Modal -->
+<div id="clientModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">Add New Client</h2>
+        
+        <form id="clientForm">
+            <input type="hidden" id="clientId" name="clientId">
+            
+            <div class="form-group">
+                <label for="clientName">
+                    <i class="fas fa-user"></i> Full Name *
+                </label>
+                <input type="text" id="clientName" name="name" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="clientPhone">
+                    <i class="fas fa-phone"></i> Phone Number
+                </label>
+                <input type="tel" id="clientPhone" name="phone" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="clientProducts">
+                    <i class="fas fa-shopping-cart"></i> Products/Services *
+                </label>
+                <textarea id="clientProducts" name="products" class="form-control" rows="3" placeholder="Describe the products or services provided..." required></textarea>
+            </div>
+
+            <div class="three-column-grid" style="display: grid; gap: 20px;">
+                <div class="form-group">
+                    <label for="totalAmount">
+                        <i class="fas fa-peso-sign"></i> Total Amount *
+                    </label>
+                    <input type="number" id="totalAmount" name="total_amount" class="form-control" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="remainingBalance">
+                        <i class="fas fa-exclamation-triangle"></i> Remaining Balance *
+                    </label>
+                    <input type="number" id="remainingBalance" name="remaining_balance" class="form-control" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="dueDate">
+                        <i class="fas fa-calendar"></i> Due Date *
+                    </label>
+                    <input type="date" id="dueDate" name="due_date" class="form-control" required>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">
+                    <i class="fas fa-save"></i> Save Client
+                </button>
+                <button type="button" onclick="closeModal()" class="btn" style="background: var(--glass-bg); border: 2px solid var(--border-color); color: var(--text-secondary);">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<button class="floating-action" onclick="document.getElementById('addClientBtn').click()" title="Add New Client">
+    <i class="fas fa-plus"></i>
+</button>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let editingClientId = null;
+
+    // Utility functions (these should be in your base.js or main.js)
+    function setLoadingState(button, loading) {
+        if (loading) {
+            button.disabled = true;
+            const originalContent = button.innerHTML;
+            button.dataset.originalContent = originalContent;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        } else {
+            button.disabled = false;
+            button.innerHTML = button.dataset.originalContent || button.innerHTML;
+        }
+    }
+
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <div>${message}</div>
+                <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: inherit; font-size: 18px; cursor: pointer; margin-left: auto;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        // Style the notification
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#4caf50' : type === 'error' ? '#f44336' : '#2196f3'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            max-width: 400px;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideOutRight 0.3s ease-in';
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 5000);
+    }
+
+    async function makeRequest(url, method = 'GET', data = null) {
+        try {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            };
+            
+            if (data && (method === 'POST' || method === 'PUT')) {
+                options.body = JSON.stringify(data);
+            }
+            
+            console.log(`Making ${method} request to ${url}`);
+            
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log(`Response from ${url}:`, result);
+            
+            return result;
+        } catch (error) {
+            console.error(`Request to ${url} failed:`, error);
+            return { success: false, message: `Network error: ${error.message}` };
+        }
+    }
+
+    function validateForm(data, rules) {
+        const errors = [];
+        
+        for (const [field, rule] of Object.entries(rules)) {
+            const value = data[field];
+            const label = rule.label || field;
+            
+            if (rule.required && (!value || value.toString().trim() === '')) {
+                errors.push(`${label} is required`);
+                continue;
+            }
+            
+            if (value && rule.minLength && value.toString().length < rule.minLength) {
+                errors.push(`${label} must be at least ${rule.minLength} characters`);
+            }
+            
+            
+            if (value && rule.number && isNaN(value)) {
+                errors.push(`${label} must be a valid number`);
+            }
+        }
+        
+        return errors;
+    }
+
+
+    // Modal functions
+    function openModal(isEdit = false, clientData = null) {
+        const modal = document.getElementById('clientModal');
+        const form = document.getElementById('clientForm');
+        const title = document.getElementById('modalTitle');
+        
+        if (isEdit && clientData) {
+            title.textContent = 'Edit Client';
+            editingClientId = clientData.id;
+            
+            // Populate form with existing data
+            document.getElementById('clientId').value = clientData.id;
+            document.getElementById('clientName').value = clientData.name || '';
+            document.getElementById('clientPhone').value = clientData.phone || '';
+            document.getElementById('clientProducts').value = clientData.products || '';
+            document.getElementById('totalAmount').value = clientData.total_amount || '';
+            document.getElementById('remainingBalance').value = clientData.remaining_balance || '';
+            document.getElementById('dueDate').value = clientData.due_date || '';
+        } else {
+            title.textContent = 'Add New Client';
+            editingClientId = null;
+            form.reset();
+            
+            // Set default due date to 30 days from now
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 30);
+            document.getElementById('dueDate').value = defaultDate.toISOString().split('T')[0];
+        }
+        
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function closeModal() {
+        document.getElementById('clientModal').style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+        editingClientId = null;
+    }
+
+    // Event listeners
+    document.getElementById('addClientBtn').addEventListener('click', () => openModal());
+    
+    document.querySelector('.close').addEventListener('click', closeModal);
+    
+    window.addEventListener('click', (e) => {
+        const modal = document.getElementById('clientModal');
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('clientModal');
+            if (modal.style.display === 'block') {
+                closeModal();
+            }
+        }
+    });
+
+    // Form submission
+    document.getElementById('clientForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const button = e.target.querySelector('button[type="submit"]');
+        setLoadingState(button, true);
+        
+        const formData = new FormData(e.target);
+        const data = {
+            name: formData.get('name').trim(),
+            phone: formData.get('phone') ? formData.get('phone').trim() : '',
+            products: formData.get('products').trim(),
+            total_amount: parseFloat(formData.get('total_amount')),
+            remaining_balance: parseFloat(formData.get('remaining_balance')),
+            due_date: formData.get('due_date')
+        };
+
+        // Validate form
+        const errors = validateForm(data, {
+            name: { required: true, minLength: 2, label: 'Full Name' },
+            products: { required: true, minLength: 5, label: 'Products/Services' },
+            total_amount: { required: true, number: true, label: 'Total Amount' },
+            remaining_balance: { required: true, number: true, label: 'Remaining Balance' },
+            due_date: { required: true, label: 'Due Date' }
+        });
+
+        // Additional validation
+        if (data.total_amount < 0) {
+            errors.push('Total amount cannot be negative');
+        }
+
+        if (data.remaining_balance < 0) {
+            errors.push('Remaining balance cannot be negative');
+        }
+
+        if (data.remaining_balance > data.total_amount) {
+            errors.push('Remaining balance cannot be greater than total amount');
+        }
+
+        // Validate due date
+        const dueDate = new Date(data.due_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (dueDate < today) {
+            const confirmed = confirm('The due date is in the past. Are you sure you want to continue?');
+            if (!confirmed) {
+                setLoadingState(button, false);
+                return;
+            }
+        }
+
+        if (errors.length > 0) {
+            showNotification(errors.join('<br>'), 'error');
+            setLoadingState(button, false);
+            return;
+        }
+
+        const url = editingClientId ? `/update_client/${editingClientId}` : '/add_client';
+        const method = editingClientId ? 'PUT' : 'POST';
+        
+        const result = await makeRequest(url, method, data);
+        
+        if (result.success) {
+            showNotification(result.message || (editingClientId ? 'Client updated successfully!' : 'Client added successfully!'), 'success');
+            closeModal();
+            
+            // Trigger notification check for new/updated clients
+            triggerNotificationCheck();
+            
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+         else {
+            showNotification(result.message || 'An error occurred. Please try again.', 'error');
+        }
+        
+        setLoadingState(button, false);
+    });
+        // trigger notifications when client data changes
+        async function triggerNotificationCheck() {
+            try {
+                await makeRequest('/trigger_notification_check');
+            } catch (error) {
+                console.error('Failed to trigger notification check:', error);
+            }
+        }
+
+    // Client management functions
+        function editClient(clientId) {
+            const row = document.querySelector(`tr[data-client-id="${clientId}"]`);
+            if (!row) {
+                showNotification('Client not found', 'error');
+                return;
+            }
+            
+            try {
+                const cells = row.cells;
+                const clientData = {
+                    id: clientId,
+                    name: cells[0].querySelector('div > div > div').textContent.trim(),
+                    phone: (function() { const s = cells[1].querySelector('span'); return s ? s.textContent.trim() : ''; })(),
+                    products: cells[2].querySelector('p').textContent.trim(),
+                    total_amount: parseFloat(cells[3].querySelector('div:nth-child(1) > div:nth-child(2)').textContent.replace('$', '')),
+                    remaining_balance: parseFloat(cells[3].querySelector('div:nth-child(2) > div:nth-child(2)').textContent.replace('$', '')),
+                    due_date: row.dataset.dueDate
+                };
+                
+                openModal(true, clientData);
+            } catch (error) {
+                console.error('Error extracting client data:', error);
+                showNotification('Error loading client data', 'error');
+            }
+        }
+
+    async function deleteClient(clientId, clientName) {
+        if (!confirm(`Are you sure you want to delete ${clientName}?\n\nThis action cannot be undone and will permanently remove all client data including payment history.`)) {
+            return;
+        }
+        
+        const result = await makeRequest(`/delete_client/${clientId}`, 'DELETE');
+        
+        if (result.success) {
+            showNotification(result.message || 'Client deleted successfully!', 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification(result.message || 'Error deleting client', 'error');
+        }
+    }
+
+    // Safer button handlers (derive clientId/name from DOM instead of inline args)
+    function getRowContext(buttonEl) {
+        const row = buttonEl.closest('tr');
+        const clientId = parseInt(row.getAttribute('data-client-id'));
+        const nameEl = row.cells[0].querySelector('div > div > div');
+        const clientName = nameEl ? nameEl.textContent.trim() : 'Client';
+        return { row, clientId, clientName };
+    }
+
+    function editClientFromButton(btn) {
+        const { clientId } = getRowContext(btn);
+        editClient(clientId);
+    }
+
+    function sendReminderFromButton(btn) {
+        const { clientId } = getRowContext(btn);
+        sendReminder(clientId);
+    }
+
+    function sendSMSReminderFromButton(btn) {
+        const { clientId } = getRowContext(btn);
+        sendSMSReminder(clientId);
+    }
+
+    function markAsPaidFromButton(btn) {
+        const { clientId, clientName } = getRowContext(btn);
+        markAsPaid(clientId, clientName);
+    }
+
+    function deleteClientFromButton(btn) {
+        const { clientId, clientName } = getRowContext(btn);
+        deleteClient(clientId, clientName);
+    }
+
+    async function sendReminder(clientId) {
+        const button = event.target.closest('button');
+        setLoadingState(button, true);
+        
+        const result = await makeRequest(`/send_reminder/${clientId}`, 'POST');
+        
+        if (result.success) {
+            showNotification(result.message || 'Reminder sent successfully!', 'success');
+        } else {
+            showNotification(result.message || 'Error sending reminder', 'error');
+        }
+        
+        setLoadingState(button, false);
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#clientsTable tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const name = row.cells[0].textContent.toLowerCase();
+            const phone = row.cells[1].textContent.toLowerCase();
+            const products = row.cells[2].textContent.toLowerCase();
+            
+            const isVisible = searchTerm === '' || 
+                            name.includes(searchTerm) || 
+                            phone.includes(searchTerm) || 
+                            products.includes(searchTerm);
+            
+            row.style.display = isVisible ? '' : 'none';
+            if (isVisible) visibleCount++;
+        });
+        
+        updateClientCount(visibleCount);
+    });
+
+    // Filter functionality
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active class from all buttons
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            // Add active class to clicked button
+            this.classList.add('active');
+            
+            const filter = this.dataset.filter;
+            filterClients(filter);
+        });
+    });
+
+    function filterClients(filter) {
+        const rows = document.querySelectorAll('#clientsTable tbody tr');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const balance = parseFloat(row.dataset.balance);
+            const dueDate = new Date(row.dataset.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            
+            const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            
+            let show = false;
+            
+            switch (filter) {
+                case 'all':
+                    show = true;
+                    break;
+                case 'overdue':
+                    show = balance > 0 && daysDiff < 0;
+                    break;
+                case 'due-today':
+                    show = balance > 0 && daysDiff === 0;
+                    break;
+                case 'due-soon':
+                    show = balance > 0 && daysDiff > 0 && daysDiff <= 7;
+                    break;
+                case 'paid':
+                    show = balance <= 0;
+                    break;
+            }
+            
+            row.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+        
+        updateClientCount(visibleCount);
+    }
+
+    function updateClientCount(count = null) {
+        const countElement = document.getElementById('clientCount');
+        if (count !== null) {
+            countElement.textContent = count;
+        } else {
+            const visibleRows = document.querySelectorAll('#clientsTable tbody tr:not([style*="display: none"])');
+            countElement.textContent = visibleRows.length;
+        }
+    }
+
+    // Status update function
+// Add this function to update client statuses and sync with chart
+function updateClientStatuses() {
+    let paidCount = 0;
+    let pendingCount = 0;
+    let overdueCount = 0;
+    
+    document.querySelectorAll('.client-status').forEach(statusElement => {
+        const balance = parseFloat(statusElement.dataset.balance);
+        const dueDate = new Date(statusElement.dataset.dueDate);
+        const today = new Date();
+        
+        if (!statusElement.dataset.dueDate) {
+            statusElement.innerHTML = '<span class="status-badge" style="background: #9e9e9e;">No Due Date</span>';
+            if (balance <= 0) {
+                paidCount++;
+            } else {
+                pendingCount++;
+            }
+            return;
+        }
+        
+        today.setHours(0, 0, 0, 0);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        
+        let statusHTML = '';
+        
+        if (balance <= 0) {
+            statusHTML = '<span class="status-badge" style="background: #4caf50;"><i class="fas fa-check"></i> Fully Paid</span>';
+            paidCount++;
+        } else if (daysDiff < 0) {
+            statusHTML = '<span class="status-badge" style="background: #f44336;"><i class="fas fa-exclamation-triangle"></i> Overdue</span>';
+            overdueCount++;
+        } else if (daysDiff === 0) {
+            statusHTML = '<span class="status-badge" style="background: #ff9800;"><i class="fas fa-clock"></i> Due Today</span>';
+            pendingCount++;
+        } else if (daysDiff <= 7) {
+            statusHTML = '<span class="status-badge" style="background: #2196f3;"><i class="fas fa-calendar"></i> Due Soon</span>';
+            pendingCount++;
+        } else {
+            statusHTML = '<span class="status-badge" style="background: #4caf50;"><i class="fas fa-calendar-check"></i> Current</span>';
+            pendingCount++;
+        }
+        
+        statusElement.innerHTML = statusHTML;
+    });
+    
+    // Update chart if it exists
+    updateChart(paidCount, pendingCount, overdueCount);
+}
+
+// Add this function to update the chart
+function updateChart(paidCount, pendingCount, overdueCount) {
+    const totalClients = paidCount + pendingCount + overdueCount;
+    
+    if (totalClients === 0) return;
+    
+    const paidPercentage = Math.round((paidCount / totalClients) * 100);
+    const pendingPercentage = Math.round((pendingCount / totalClients) * 100);
+    const overduePercentage = Math.round((overdueCount / totalClients) * 100);
+    
+    // Update chart data elements if they exist
+    const chartData = {
+        paid: { count: paidCount, percentage: paidPercentage },
+        pending: { count: pendingCount, percentage: pendingPercentage },
+        overdue: { count: overdueCount, percentage: overduePercentage }
+    };
+    
+    // Update any chart elements in the DOM
+    updateChartDisplay(chartData);
+}
+
+// Add this function to update chart display
+function updateChartDisplay(chartData) {
+    // Update chart counters if they exist
+    const paidCountElement = document.querySelector('#paid-count');
+    const pendingCountElement = document.querySelector('#pending-count');
+    const overdueCountElement = document.querySelector('#overdue-count');
+    
+    if (paidCountElement) paidCountElement.textContent = chartData.paid.count;
+    if (pendingCountElement) pendingCountElement.textContent = chartData.pending.count;
+    if (overdueCountElement) overdueCountElement.textContent = chartData.overdue.count;
+    
+    // Update chart percentages if they exist
+    const paidBar = document.querySelector('#paid-bar');
+    const pendingBar = document.querySelector('#pending-bar');
+    const overdueBar = document.querySelector('#overdue-bar');
+    
+    if (paidBar) paidBar.style.width = chartData.paid.percentage + '%';
+    if (pendingBar) pendingBar.style.width = chartData.pending.percentage + '%';
+    if (overdueBar) overdueBar.style.width = chartData.overdue.percentage + '%';
+}
+
+// Update the filter function to include paid status
+function filterClients(filter) {
+    const rows = document.querySelectorAll('#clientsTable tbody tr');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const balance = parseFloat(row.dataset.balance);
+        const dueDate = new Date(row.dataset.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        
+        let show = false;
+        
+        switch (filter) {
+            case 'all':
+                show = true;
+                break;
+            case 'overdue':
+                show = balance > 0 && daysDiff < 0;
+                break;
+            case 'due-today':
+                show = balance > 0 && daysDiff === 0;
+                break;
+            case 'due-soon':
+                show = balance > 0 && daysDiff > 0 && daysDiff <= 7;
+                break;
+            case 'paid':
+                show = balance <= 0;
+                break;
+        }
+        
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+    
+    updateClientCount(visibleCount);
+}
+
+    // Auto-sync total and remaining balance
+    document.getElementById('totalAmount').addEventListener('input', function() {
+        const totalAmount = parseFloat(this.value) || 0;
+        const remainingBalance = parseFloat(document.getElementById('remainingBalance').value) || 0;
+        
+        // If remaining balance is greater than total, adjust it
+        if (remainingBalance > totalAmount) {
+            document.getElementById('remainingBalance').value = totalAmount;
+        }
+        
+        // Set max attribute for remaining balance
+        document.getElementById('remainingBalance').setAttribute('max', totalAmount);
+    });
+
+    document.getElementById('remainingBalance').addEventListener('input', function() {
+        const totalAmount = parseFloat(document.getElementById('totalAmount').value) || 0;
+        const remainingBalance = parseFloat(this.value) || 0;
+        
+        // Warn if remaining balance exceeds total
+        if (remainingBalance > totalAmount && totalAmount > 0) {
+            this.style.borderColor = '#f44336';
+            this.style.boxShadow = '0 0 5px rgba(244, 67, 54, 0.5)';
+        } else {
+            this.style.borderColor = '';
+            this.style.boxShadow = '';
+        }
+    });
+
+    // Auto-calculate paid percentage in form
+    function updatePaymentProgress() {
+        const totalAmount = parseFloat(document.getElementById('totalAmount').value) || 0;
+        const remainingBalance = parseFloat(document.getElementById('remainingBalance').value) || 0;
+        
+        if (totalAmount > 0) {
+            const paidAmount = totalAmount - remainingBalance;
+            const percentage = (paidAmount / totalAmount) * 100;
+            
+            // You could add a visual indicator here if needed
+            console.log(`Payment progress: ${percentage.toFixed(1)}%`);
+        }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + N to add new client
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            document.getElementById('addClientBtn').click();
+        }
+        
+        // Ctrl/Cmd + F to focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('searchInput').focus();
+        }
+    });
+
+    // Table sorting functionality
+    function initTableSorting() {
+        const table = document.getElementById('clientsTable');
+        const headers = table.querySelectorAll('th');
+        
+        headers.forEach((header, index) => {
+            if (index < 6) { // Don't make Actions column sortable
+                header.style.cursor = 'pointer';
+                header.style.userSelect = 'none';
+                header.title = 'Click to sort';
+                
+                header.addEventListener('click', () => {
+                    sortTable(index);
+                });
+            }
+        });
+    }
+
+    function sortTable(columnIndex) {
+        const table = document.getElementById('clientsTable');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        // Determine sort direction
+        const currentSort = table.dataset.sortColumn;
+        const currentDirection = table.dataset.sortDirection || 'asc';
+        const newDirection = (currentSort == columnIndex && currentDirection === 'asc') ? 'desc' : 'asc';
+        
+        // Sort rows
+        rows.sort((a, b) => {
+            let aVal, bVal;
+            
+            switch (columnIndex) {
+                case 0: // Name
+                    aVal = a.cells[0].textContent.trim().toLowerCase();
+                    bVal = b.cells[0].textContent.trim().toLowerCase();
+                    break;
+                case 1: // Phone
+                    {
+                        const aSpan = a.cells[1].querySelector('span');
+                        const bSpan = b.cells[1].querySelector('span');
+                        aVal = aSpan ? aSpan.textContent.trim().toLowerCase() : '';
+                        bVal = bSpan ? bSpan.textContent.trim().toLowerCase() : '';
+                    }
+                    break;
+                case 3: // Financial - sort by remaining balance
+                    aVal = parseFloat(a.dataset.balance);
+                    bVal = parseFloat(b.dataset.balance);
+                    break;
+                case 4: // Due Date
+                    aVal = new Date(a.dataset.dueDate);
+                    bVal = new Date(b.dataset.dueDate);
+                    break;
+                case 5: // Status - sort by balance then due date
+                    const aBalance = parseFloat(a.dataset.balance);
+                    const bBalance = parseFloat(b.dataset.balance);
+                    if (aBalance !== bBalance) {
+                        aVal = aBalance;
+                        bVal = bBalance;
+                    } else {
+                        aVal = new Date(a.dataset.dueDate);
+                        bVal = new Date(b.dataset.dueDate);
+                    }
+                    break;
+                default:
+                    aVal = a.cells[columnIndex].textContent.trim().toLowerCase();
+                    bVal = b.cells[columnIndex].textContent.trim().toLowerCase();
+            }
+            
+            if (aVal < bVal) return newDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return newDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        // Update table
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Update sort indicators
+        table.dataset.sortColumn = columnIndex;
+        table.dataset.sortDirection = newDirection;
+        
+        // Update header indicators
+        table.querySelectorAll('th').forEach((th, idx) => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if (idx === columnIndex) {
+                th.classList.add(newDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+        });
+    }
+
+    // Export functionality
+    function exportToCSV() {
+        const table = document.getElementById('clientsTable');
+        const rows = table.querySelectorAll('tr:not([style*="display: none"])');
+        const csvContent = [];
+        
+        // Headers
+        const headers = ['Name', 'Phone', 'Products', 'Total Amount', 'Remaining Balance', 'Due Date', 'Status'];
+        csvContent.push(headers.join(','));
+        
+        // Data rows
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const cells = row.cells;
+            const rowData = [
+                `"${cells[0].querySelector('div > div > div').textContent.trim()}"`,
+                `"${(function(){ const s = cells[1].querySelector('span'); return s ? s.textContent.trim() : 'N/A'; })()}"`,
+                `"${cells[2].querySelector('p').textContent.trim().replace(/"/g, '""')}"`,
+                cells[3].querySelector('div:nth-child(1) > div:nth-child(2)').textContent.trim(),
+                cells[3].querySelector('div:nth-child(2) > div:nth-child(2)').textContent.trim(),
+                cells[4].querySelector('div').textContent.trim(),
+                `"${cells[5].textContent.trim()}"`
+            ];
+            csvContent.push(rowData.join(','));
+        }
+        
+        // Download
+        const blob = new Blob([csvContent.join('\n')], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `clients_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Initialize everything when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        updateClientStatuses();
+        initTableSorting();
+        
+        // Add export button if needed
+        const headerDiv = document.querySelector('div[style*="justify-content: space-between"]');
+        if (headerDiv && document.querySelectorAll('#clientsTable tbody tr').length > 0) {
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'btn btn-secondary';
+            exportBtn.style.cssText = 'margin-left: 10px; padding: 8px 15px;';
+            exportBtn.innerHTML = '<i class="fas fa-download"></i> Export CSV';
+            exportBtn.onclick = exportToCSV;
+            
+            const clientCountDiv = headerDiv.querySelector('div[style*="color: var(--text-secondary)"]');
+            clientCountDiv.appendChild(exportBtn);
+        }
+        
+        // Update statuses every 60 seconds to handle "due today" changes
+        setInterval(updateClientStatuses, 60000);
+
+        // Apply progress widths from data-progress attributes
+        document.querySelectorAll('.progress-inner').forEach(function(el){
+            var pct = parseFloat(el.getAttribute('data-progress')) || 0;
+            el.style.width = pct + '%';
+        });
+    });
+
+    // Phone number formatting (optional)
+    document.getElementById('clientPhone').addEventListener('input', function() {
+        let value = this.value.replace(/\D/g, '');
+        if (value.length >= 6) {
+            if (value.length <= 11) {
+                value = value.replace(/(\d{3})(\d{3})(\d{1,4})/, '$1-$2-$3');
+            } else {
+                value = value.replace(/(\d{3})(\d{3})(\d{4})(.*)/, '$1-$2-$3');
+            }
+        } else if (value.length >= 3) {
+            value = value.replace(/(\d{3})(\d{1,3})/, '$1-$2');
+        }
+        this.value = value;
+    });
+
+    // Auto-save form data to prevent loss (using memory storage only)
+    let formAutoSaveData = {};
+    
+    function saveFormData() {
+        const form = document.getElementById('clientForm');
+        const formData = new FormData(form);
+        formAutoSaveData = {};
+        
+        for (let [key, value] of formData.entries()) {
+            formAutoSaveData[key] = value;
+        }
+    }
+    
+    function restoreFormData() {
+        if (Object.keys(formAutoSaveData).length === 0) return;
+        
+        for (let [key, value] of Object.entries(formAutoSaveData)) {
+            const element = document.querySelector(`[name="${key}"]`);
+            if (element) {
+                element.value = value;
+            }
+        }
+    }
+    
+    // Save form data on input
+    document.getElementById('clientForm').addEventListener('input', debounce(saveFormData, 1000));
+    
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Clear auto-saved data when form is submitted or modal is closed
+    document.getElementById('clientForm').addEventListener('submit', () => {
+        formAutoSaveData = {};
+    });
+    
+    const originalCloseModal = closeModal;
+    closeModal = function() {
+        formAutoSaveData = {};
+        originalCloseModal();
+    };
+
+    console.log('Client management system initialized successfully');
+
+    // Add function to mark client as fully paid
+    async function markAsPaid(clientId, clientName) {
+        if (!confirm(`Mark ${clientName} as fully paid?\n\nThis will set the remaining balance to 0.`)) {
+            return;
+        }
+        
+        const button = event.target.closest('button');
+        setLoadingState(button, true);
+        
+        const result = await makeRequest(`/mark_as_paid/${clientId}`, 'PUT');
+        
+        if (result.success) {
+            showNotification(result.message || 'Client marked as paid successfully!', 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification(result.message || 'Error marking client as paid', 'error');
+        }
+        
+        setLoadingState(button, false);
+    }
+
+    // Send individual SMS reminder
+    async function sendSMSReminder(clientId) {
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        
+        // Show loading state
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        
+        try {
+            console.log(`Attempting to send SMS to client ID: ${clientId}`);
+            
+            const result = await makeRequest(`/send_sms_reminder/${clientId}`, 'POST');
+            
+            console.log('SMS Result:', result);
+            
+            if (result.success) {
+                showNotification(result.message || 'FREE SMS reminder sent successfully!', 'success');
+                
+                // Update button to show sent status temporarily
+                button.style.background = '#4caf50';
+                button.innerHTML = '<i class="fas fa-check"></i> Sent!';
+                
+                setTimeout(() => {
+                    button.style.background = '';
+                    button.innerHTML = originalHTML;
+                    button.disabled = false;
+                }, 3000);
+            } else {
+                showNotification(result.message || 'Error sending FREE SMS reminder', 'error');
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
+        } catch (error) {
+            console.error('SMS Error:', error);
+            showNotification('Network error sending SMS reminder', 'error');
+            button.disabled = false;
+            button.innerHTML = originalHTML;
+        }
+    }
+
+    // Send SMS reminders to all clients with outstanding balances
+    async function sendAllSMSReminders() {
+        try {
+            // First, check how many clients would receive SMS
+            const checkResult = await makeRequest('/check_sms_eligible_clients', 'GET');
+            
+            if (!checkResult.success || checkResult.count === 0) {
+                showNotification('No clients with phone numbers and outstanding balances found', 'warning');
+                return;
+            }
+            
+            if (!confirm(`Send FREE SMS reminders to ${checkResult.count} clients with phone numbers and outstanding balances?`)) {
+                return;
+            }
+            
+            const button = (typeof event !== 'undefined' && event && event.target) ? event.target : null;
+            const originalHTML = button ? button.innerHTML : '';
+            
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending to all...';
+            }
+            
+            showNotification(`Sending FREE SMS reminders to ${checkResult.count} clients...`, 'info');
+            
+            const result = await makeRequest('/send_all_sms_reminders', 'POST');
+            
+            console.log('Bulk SMS Result:', result);
+            
+            if (result.success) {
+                const message = `Successfully sent ${result.sent_count || 0} FREE SMS reminders!` + 
+                            (result.failed_count > 0 ? ` ${result.failed_count} failed.` : '');
+                showNotification(message, 'success');
+            } else {
+                showNotification(result.message || 'Failed to send SMS reminders', 'error');
+            }
+            
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
+        } catch (error) {
+            console.error('Bulk SMS Error:', error);
+            showNotification('Network error sending SMS reminders', 'error');
+            
+            const button = (typeof event !== 'undefined' && event && event.target) ? event.target : null;
+            if (button && button.innerHTML.includes('Sending')) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-broadcast-tower"></i> Send FREE SMS to All';
+            }
+        }
+    }
+
+// Utility function for API requests
+async function makeRequest(url, method = 'GET', data = null) {
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (data) {
+        options.body = JSON.stringify(data);
+    }
+    
+    const response = await fetch(url, options);
+    return await response.json();
+}
+
+// Show notification function
+function showNotification(message, type = 'info') {
+    // Remove any existing notifications
+    const existing = document.querySelector('.sms-notification');
+    if (existing) {
+        existing.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `sms-notification notification-${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10001;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideInRight 0.3s ease-out;
+        font-size: 14px;
+    `;
+    
+    const colors = {
+        success: '#4caf50',
+        error: '#f44336',
+        warning: '#ff9800',
+        info: '#2196f3'
+    };
+    
+    notification.style.backgroundColor = colors[type] || colors.info;
+    
+    const icons = {
+        success: 'check-circle',
+        error: 'exclamation-circle',
+        warning: 'exclamation-triangle',
+        info: 'info-circle'
+    };
+    
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-${icons[type] || icons.info}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, 5000);
+}
+
+// Add CSS animations if not already present
+if (!document.getElementById('sms-animations')) {
+    const style = document.createElement('style');
+    style.id = 'sms-animations';
+    style.textContent = `
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        .btn-sms {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-sms:hover {
+            background: linear-gradient(135deg, #45a049, #3d8b40);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .btn-sms:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    `;
+    document.head.appendChild(style);
+}
+</script>
+
+<style>
+/* Additional CSS for enhanced functionality */
+.three-column-grid { grid-template-columns: 1fr 1fr 1fr; }
+.notification {
+    animation: slideInRight 0.3s ease-out;
+}
+
+/* New helpers to avoid inline style templating */
+.amount-outstanding {
+    font-weight: bold;
+    font-size: 18px;
+}
+.amount-outstanding.amount-due { color: #ff6b6b; }
+.amount-outstanding.amount-paid { color: #4caf50; }
+
+.progress-outer {
+    background: var(--glass-bg);
+    border-radius: 10px;
+    height: 6px;
+    margin-bottom: 5px;
+    overflow: hidden;
+}
+.progress-inner {
+    height: 100%;
+    border-radius: 10px;
+    width: 0;
+    transition: width 0.6s ease;
+}
+.progress-active { background: var(--primary-gradient); }
+.progress-complete { background: #4caf50; }
+
+/* Action buttons compact and consistent styles */
+.action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-compact { padding: 8px 12px; font-size: 12px; }
+.btn-warning-gradient { background: var(--warning-gradient); color: #fff; }
+.btn-disabled { background: #ccc; cursor: not-allowed; }
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.table th {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.table th:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.table th.sort-asc::after {
+    content: '▲';
+    position: absolute;
+    right: 8px;
+    font-size: 10px;
+    color: var(--primary-color);
+}
+
+.table th.sort-desc::after {
+    content: '▼';
+    position: absolute;
+    right: 8px;
+    font-size: 10px;
+    color: var(--primary-color);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+.modal {
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.floating-action {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    border: none;
+    color: white;
+    font-size: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.floating-action:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(0,0,0,0.4);
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .modal-content {
+        margin: 5% auto;
+        width: 95%;
+        max-width: none;
+    }
+    
+    .table-responsive {
+        font-size: 14px;
+    }
+    
+    .floating-action {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+    
+    .data-filters {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filter-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Form validation styles */
+.form-control:invalid:not(:focus):not(:placeholder-shown) {
+    border-color: #f44336;
+    box-shadow: 0 0 5px rgba(244, 67, 54, 0.3);
+}
+
+.form-control:valid:not(:focus):not(:placeholder-shown) {
+    border-color: #4caf50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+}
+
+/* Improved accessibility */
+.btn:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.form-control:focus {
+    z-index: 1;
+}
+
+/* Print styles */
+@media print {
+    .floating-action,
+    .modal,
+    .btn,
+    .data-filters {
+        display: none !important;
+    }
+    
+    .glass-card {
+        background: white !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .table {
+        font-size: 12px;
+    }
+    
+    .status-badge {
+        background: #ddd !important;
+        color: #333 !important;
+    }
+}
+@media (max-width: 1024px) {
+    .container {
+        padding: 20px 16px;
+    }
+    
+    .search-box {
+        min-width: 250px;
+    }
+    
+    .data-filters {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .filter-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 15px 12px;
+    }
+    
+    /* Header Section */
+    .header-section {
+        margin: 20px 0;
+    }
+    
+    .header-section > div {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .header-section h1 {
+        font-size: 32px;
+        margin-bottom: 8px;
+    }
+    
+    .header-section p {
+        font-size: 16px;
+    }
+    
+    /* Glass Card Adjustments */
+    .glass-card {
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+    }
+    
+    /* Search and Filters */
+    .search-filters-container {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .search-box {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .data-filters {
+        justify-content: space-between;
+        gap: 8px;
+    }
+    
+    .filter-btn {
+        flex: 1;
+        padding: 10px 8px;
+        font-size: 12px;
+        text-align: center;
+        min-width: 0;
+    }
+    
+    /* Table Responsive */
+    .table-responsive {
+        font-size: 13px;
+        border-radius: 8px;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .table {
+        min-width: 900px; /* Ensure table doesn't collapse too much */
+    }
+    
+    .table th,
+    .table td {
+        padding: 10px 8px;
+        white-space: nowrap;
+    }
+    
+    .table th {
+        font-size: 12px;
+        position: sticky;
+        top: 0;
+        background: var(--card-bg);
+        z-index: 10;
+    }
+    
+    /* Client Info Column */
+    .client-info {
+        min-width: 180px;
+    }
+    
+    .client-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+    
+    .client-name {
+        font-size: 14px;
+        font-weight: 600;
+    }
+    
+    .client-id,
+    .client-added {
+        font-size: 11px;
+    }
+    
+    /* Contact Info Column */
+    .contact-info {
+        min-width: 120px;
+    }
+    
+    .contact-info i {
+        width: 10px;
+    }
+    
+    .contact-info span {
+        font-size: 12px;
+    }
+    
+    /* Products Column */
+    .products-column {
+        max-width: 200px;
+        min-width: 180px;
+    }
+    
+    .products-content {
+        font-size: 12px;
+        padding: 8px;
+    }
+    
+    /* Financial Summary */
+    .financial-summary {
+        min-width: 140px;
+    }
+    
+    .amount-display {
+        font-size: 14px;
+    }
+    
+    .amount-label {
+        font-size: 10px;
+    }
+    
+    .progress-bar {
+        height: 4px;
+    }
+    
+    .progress-text {
+        font-size: 10px;
+    }
+    
+    /* Due Date Column */
+    .due-date-column {
+        min-width: 100px;
+        text-align: center;
+    }
+    
+    .due-date-main {
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .due-date-info {
+        font-size: 10px;
+    }
+    
+    /* Actions Column */
+    .actions-column {
+        min-width: 140px;
+    }
+    
+    .action-btn {
+        padding: 6px 8px;
+        font-size: 11px;
+        margin: 2px;
+    }
+    
+    /* Modal Adjustments */
+    .modal-content {
+        margin: 5% auto;
+        width: 95%;
+        max-width: 500px;
+        padding: 20px;
+    }
+    
+    .modal-content h2 {
+        font-size: 22px;
+        margin-bottom: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-group label {
+        font-size: 14px;
+    }
+    
+    .form-control {
+        padding: 12px 14px;
+        font-size: 16px;
+    }
+    
+    /* Three-column grid adjustment */
+    .three-column-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    /* Floating Action Button */
+    .floating-action {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 12px 8px;
+    }
+    
+    /* Header adjustments */
+    .header-section h1 {
+        font-size: 28px;
+    }
+    
+    .header-section p {
+        font-size: 15px;
+    }
+    
+    /* Glass card */
+    .glass-card {
+        padding: 14px;
+    }
+    
+    /* Search and filters stack vertically */
+    .data-filters {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filter-btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 13px;
+    }
+    
+    /* Table becomes more compact */
+    .table {
+        font-size: 12px;
+        min-width: 800px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 8px 6px;
+    }
+    
+    /* Simplify client info display */
+    .client-info {
+        min-width: 160px;
+    }
+    
+    .client-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .client-name {
+        font-size: 13px;
+    }
+    
+    /* Compact financial display */
+    .financial-summary {
+        min-width: 120px;
+    }
+    
+    .amount-display {
+        font-size: 13px;
+    }
+    
+    /* Action buttons become more compact */
+    .actions-column {
+        min-width: 120px;
+    }
+    
+    .action-btn {
+        padding: 5px 6px;
+        font-size: 10px;
+        margin: 1px;
+    }
+    
+    /* Modal becomes full-screen-like */
+    .modal-content {
+        margin: 10px;
+        width: calc(100% - 20px);
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        padding: 16px;
+    }
+    
+    .modal-content h2 {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 10px 6px;
+    }
+    
+    /* Header becomes more compact */
+    .header-section {
+        margin: 15px 0;
+    }
+    
+    .header-section h1 {
+        font-size: 24px;
+        line-height: 1.2;
+    }
+    
+    .header-section p {
+        font-size: 14px;
+    }
+    
+    /* Glass cards more compact */
+    .glass-card {
+        padding: 12px;
+        border-radius: 10px;
+    }
+    
+    /* Search input */
+    .search-box input {
+        padding: 12px 16px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Filters in 2 columns */
+    .data-filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    
+    .filter-btn {
+        padding: 10px 6px;
+        font-size: 12px;
+        border-radius: 6px;
+    }
+    
+    /* Table horizontal scroll indicator */
+    .table-responsive::after {
+        content: '← Scroll for more →';
+        position: absolute;
+        bottom: 10px;
+        right: 50%;
+        transform: translateX(50%);
+        font-size: 11px;
+        color: var(--text-secondary);
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    
+    .table {
+        min-width: 700px;
+    }
+    
+    /* Further compact table */
+    .table th,
+    .table td {
+        padding: 6px 4px;
+    }
+    
+    .client-info {
+        min-width: 140px;
+    }
+    
+    .client-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+    
+    .products-column {
+        min-width: 150px;
+        max-width: 150px;
+    }
+    
+    .products-content {
+        font-size: 11px;
+        padding: 6px;
+        line-height: 1.2;
+    }
+    
+    .financial-summary {
+        min-width: 100px;
+    }
+    
+    .due-date-column {
+        min-width: 80px;
+    }
+    
+    .actions-column {
+        min-width: 100px;
+    }
+    
+    .action-btn {
+        padding: 4px 5px;
+        font-size: 9px;
+        border-radius: 4px;
+    }
+    
+    /* Modal adjustments */
+    .modal-content {
+        margin: 5px;
+        width: calc(100% - 10px);
+        padding: 14px;
+        border-radius: 8px;
+    }
+    
+    .form-group label {
+        font-size: 13px;
+    }
+    
+    .form-control {
+        padding: 10px 12px;
+        font-size: 16px;
+    }
+    
+    /* Floating action button */
+    .floating-action {
+        bottom: 15px;
+        right: 15px;
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+}
+
+/* Extra small devices (360px and below) */
+@media (max-width: 360px) {
+    .container {
+        padding: 8px 4px;
+    }
+    
+    .header-section h1 {
+        font-size: 22px;
+    }
+    
+    .glass-card {
+        padding: 10px;
+        margin-bottom: 12px;
+    }
+    
+    /* Filters in single column for very small screens */
+    .data-filters {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    
+    .filter-btn {
+        padding: 8px;
+        font-size: 11px;
+    }
+    
+    /* Table becomes even more compact */
+    .table {
+        font-size: 11px;
+        min-width: 650px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 4px 2px;
+    }
+    
+    .client-info {
+        min-width: 120px;
+    }
+    
+    .client-avatar {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+    }
+    
+    .client-name {
+        font-size: 12px;
+    }
+    
+    .client-id,
+    .client-added {
+        font-size: 9px;
+    }
+    
+    .products-column {
+        min-width: 130px;
+        max-width: 130px;
+    }
+    
+    .products-content {
+        font-size: 10px;
+        padding: 4px;
+    }
+    
+    .financial-summary {
+        min-width: 90px;
+    }
+    
+    .amount-display {
+        font-size: 11px;
+    }
+    
+    .amount-label {
+        font-size: 9px;
+    }
+    
+    .due-date-column {
+        min-width: 70px;
+    }
+    
+    .due-date-main {
+        font-size: 10px;
+    }
+    
+    .due-date-info {
+        font-size: 8px;
+    }
+    
+    .actions-column {
+        min-width: 90px;
+    }
+    
+    .action-btn {
+        padding: 3px 4px;
+        font-size: 8px;
+        margin: 1px;
+    }
+    
+    .action-btn i {
+        font-size: 10px;
+    }
+    
+    /* Modal for very small screens */
+    .modal {
+        padding: 0;
+    }
+    
+    .modal-content {
+        margin: 0;
+        width: 100%;
+        height: 100vh;
+        border-radius: 0;
+        padding: 12px;
+        overflow-y: auto;
+    }
+    
+    .modal-content h2 {
+        font-size: 18px;
+        margin-bottom: 12px;
+    }
+    
+    .form-control {
+        padding: 8px 10px;
+        font-size: 16px;
+    }
+    
+    textarea.form-control {
+        min-height: 80px;
+    }
+}
+
+/* Ultra small devices (320px and below) */
+@media (max-width: 320px) {
+    .container {
+        padding: 6px 2px;
+    }
+    
+    .header-section {
+        margin: 10px 0;
+    }
+    
+    .header-section h1 {
+        font-size: 20px;
+    }
+    
+    .header-section p {
+        font-size: 13px;
+    }
+    
+    .glass-card {
+        padding: 8px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+    }
+    
+    /* Search input */
+    .search-box input {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    
+    .search-icon {
+        left: 10px;
+        font-size: 12px;
+    }
+    
+    /* Single column filters */
+    .data-filters {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+    
+    .filter-btn {
+        padding: 6px;
+        font-size: 10px;
+        border-radius: 4px;
+    }
+    
+    /* Minimum viable table */
+    .table {
+        font-size: 10px;
+        min-width: 600px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 3px 1px;
+        vertical-align: top;
+    }
+    
+    .client-info {
+        min-width: 100px;
+    }
+    
+    .client-avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+    
+    .client-name {
+        font-size: 11px;
+    }
+    
+    .products-column {
+        min-width: 110px;
+        max-width: 110px;
+    }
+    
+    .products-content {
+        font-size: 9px;
+        padding: 3px;
+        line-height: 1.1;
+    }
+    
+    .financial-summary {
+        min-width: 80px;
+    }
+    
+    .amount-display {
+        font-size: 10px;
+    }
+    
+    .due-date-column {
+        min-width: 60px;
+    }
+    
+    .due-date-main {
+        font-size: 9px;
+    }
+    
+    .due-date-info {
+        font-size: 8px;
+        line-height: 1.1;
+    }
+    
+    .actions-column {
+        min-width: 80px;
+    }
+    
+    .action-btn {
+        padding: 2px 3px;
+        font-size: 7px;
+        margin: 0.5px;
+        border-radius: 2px;
+    }
+    
+    .action-btn i {
+        font-size: 8px;
+    }
+    
+    /* Status badges */
+    .status-badge {
+        font-size: 8px;
+        padding: 2px 6px;
+        border-radius: 10px;
+    }
+    
+    /* Progress bars */
+    .progress-bar {
+        height: 3px;
+    }
+    
+    .progress-text {
+        font-size: 8px;
+    }
+    
+    /* Floating action button */
+    .floating-action {
+        bottom: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+}
+
+/* Minimum device width (300px and below) */
+@media (max-width: 300px) {
+    .container {
+        padding: 4px 1px;
+        min-width: 280px;
+    }
+    
+    .header-section h1 {
+        font-size: 18px;
+        line-height: 1.1;
+    }
+    
+    .header-section p {
+        font-size: 12px;
+    }
+    
+    .glass-card {
+        padding: 6px;
+        margin-bottom: 8px;
+    }
+    
+    /* Compact search */
+    .search-box {
+        position: relative;
+    }
+    
+    .search-box input {
+        padding: 8px 10px 8px 32px;
+        font-size: 14px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .search-icon {
+        left: 8px;
+        font-size: 11px;
+    }
+    
+    /* Minimal filters */
+    .filter-btn {
+        padding: 5px;
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Ultra compact table */
+    .table-responsive {
+        border-radius: 6px;
+    }
+    
+    .table {
+        font-size: 9px;
+        min-width: 550px;
+        border-collapse: collapse;
+    }
+    
+    .table th {
+        padding: 2px 1px;
+        font-size: 8px;
+        font-weight: 600;
+        background: var(--glass-bg);
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .table td {
+        padding: 2px 1px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        vertical-align: top;
+    }
+    
+    /* Minimal client info */
+    .client-info {
+        min-width: 90px;
+    }
+    
+    .client-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 8px;
+        border-radius: 50%;
+    }
+    
+    .client-name {
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.1;
+    }
+    
+    .client-id,
+    .client-added {
+        font-size: 7px;
+        line-height: 1;
+    }
+    
+    /* Contact info minimal */
+    .contact-info {
+        min-width: 70px;
+    }
+    
+    .contact-info i {
+        font-size: 7px;
+        width: 8px;
+    }
+    
+    .contact-info span {
+        font-size: 8px;
+    }
+    
+    /* Products minimal */
+    .products-column {
+        min-width: 100px;
+        max-width: 100px;
+    }
+    
+    .products-content {
+        font-size: 8px;
+        padding: 2px;
+        line-height: 1;
+        max-height: 30px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Financial minimal */
+    .financial-summary {
+        min-width: 70px;
+        text-align: center;
+    }
+    
+    .amount-label {
+        font-size: 7px;
+        margin-bottom: 1px;
+    }
+    
+    .amount-display {
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1;
+    }
+    
+    .progress-bar {
+        height: 2px;
+        margin: 2px 0;
+        border-radius: 1px;
+    }
+    
+    .progress-text {
+        font-size: 7px;
+    }
+    
+    /* Due date minimal */
+    .due-date-column {
+        min-width: 50px;
+        text-align: center;
+    }
+    
+    .due-date-main {
+        font-size: 8px;
+        font-weight: 600;
+        line-height: 1;
+    }
+    
+    .due-date-info {
+        font-size: 7px;
+        line-height: 1;
+        margin-top: 1px;
+    }
+    
+    /* Status minimal */
+    .status-badge {
+        font-size: 7px;
+        padding: 1px 4px;
+        border-radius: 8px;
+        display: inline-block;
+        max-width: 60px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    /* Actions minimal */
+    .actions-column {
+        min-width: 70px;
+    }
+    
+    .action-btn {
+        padding: 1px 2px;
+        font-size: 6px;
+        margin: 0.5px;
+        border-radius: 2px;
+        min-width: 16px;
+        min-height: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .action-btn i {
+        font-size: 7px;
+    }
+    
+    /* Modal full screen */
+    .modal-content {
+        width: 100%;
+        height: 100vh;
+        margin: 0;
+        border-radius: 0;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    
+    .modal-content h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+    
+    .form-group {
+        margin-bottom: 12px;
+    }
+    
+    .form-group label {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .form-control {
+        padding: 6px 8px;
+        font-size: 14px;
+        border-radius: 4px;
+    }
+    
+    /* Three column grid to single column */
+    .three-column-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    /* Button adjustments */
+    .btn {
+        padding: 6px 8px;
+        font-size: 12px;
+        border-radius: 4px;
+    }
+    
+    /* Floating button minimal */
+    .floating-action {
+        bottom: 8px;
+        right: 8px;
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+        border-radius: 50%;
+    }
+}
+
+/* Landscape orientation for very small devices */
+@media (max-width: 600px) and (orientation: landscape) and (max-height: 400px) {
+    .modal-content {
+        height: 100vh;
+        overflow-y: auto;
+        padding: 8px;
+    }
+    
+    .header-section {
+        margin: 10px 0;
+    }
+    
+    .header-section h1 {
+        font-size: 20px;
+    }
+    
+    .glass-card {
+        padding: 8px;
+    }
+    
+    .table-responsive {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+    
+    .floating-action {
+        bottom: 10px;
+        right: 10px;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .action-btn {
+        min-width: 24px;
+        min-height: 24px;
+        padding: 4px;
+    }
+    
+    .filter-btn {
+        min-height: 36px;
+        padding: 8px 12px;
+    }
+    
+    .form-control {
+        min-height: 40px;
+    }
+    
+    .floating-action {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    /* Increase touch targets for small screens */
+    @media (max-width: 480px) {
+        .action-btn {
+            min-width: 28px;
+            min-height: 28px;
+        }
+        
+        .filter-btn {
+            min-height: 40px;
+        }
+    }
+}
+
+/* Print styles for mobile */
+@media print {
+    .container {
+        padding: 0;
+    }
+    
+    .floating-action,
+    .modal,
+    .data-filters,
+    .actions-column {
+        display: none !important;
+    }
+    
+    .table {
+        font-size: 10px;
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .glass-card {
+        background: white !important;
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+}
+
+/* Ensure proper spacing and layout */
+.table-responsive {
+    position: relative;
+}
+
+/* True stacked mobile cards for very small screens */
+@media (max-width: 600px) {
+    .table.table-mobile thead {
+        display: none;
+    }
+    .table.table-mobile,
+    .table.table-mobile tbody,
+    .table.table-mobile tr,
+    .table.table-mobile td {
+        display: block;
+        width: 95%;
+    }
+    .table.table-mobile tr {
+        background: var(--glass-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    .table.table-mobile td {
+        border: none;
+        padding: 8px 6px;
+        position: relative;
+    }
+    .table.table-mobile td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .action-row { gap: 6px; }
+    .btn-compact { padding: 8px 10px; font-size: 11px; }
+    .products-column, .financial-summary, .due-date-column, .actions-column { min-width: 0; }
+}
+
+/* Loading states for mobile */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Improved accessibility for small screens */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Focus indicators for keyboard navigation */
+.action-btn:focus,
+.filter-btn:focus,
+.floating-action:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Smooth transitions */
+.table tr,
+.action-btn,
+.filter-btn {
+    transition: all 0.2s ease;
+}
+
+/* Prevent text selection on buttons */
+.filter-btn,
+.action-btn,
+.floating-action {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+</style>
+{% endblock %}

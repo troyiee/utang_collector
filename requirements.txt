@@ -1,0 +1,7 @@
+flask==3.0.3
+flask-mysqldb==2.0.0
+werkzeug==3.0.3
+requests==2.32.3
+python-dotenv==1.0.1
+mysqlclient==2.2.4
+gunicorn==22.0.0
