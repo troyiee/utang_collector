@@ -202,7 +202,6 @@
                     <tr>
                         <th>Client</th>
                         <th>Contact</th>
-                        <th>Products</th>
                         <th>Outstanding</th>
                         <th>Due Date</th>
                         <th>Status</th>
@@ -211,68 +210,63 @@
                 </thead>
                 <tbody>
                     {% for client in due_clients %}
-                    <tr>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                                    {{ client.name[0].upper() }}
+                       <tr class="due-payment-row" data-client-id="{{ client.id }}">
+                            <td class="client-name-cell">
+                                <div class="client-name-container">
+                                    <i class="fas fa-user"></i>
+                                    <span class="client-name">{{ client.name }}</span>
                                 </div>
-                                <div>
-                                    <div style="font-weight: 600;">{{ client.name }}</div>
-                                    <div style="color: var(--text-secondary); font-size: 12px;">ID: #{{ client.id }}</div>
+                            </td>
+                            
+                            <td class="phone-cell">
+                                <div class="phone-container">
+                                    {% if client.phone %}
+                                        <i class="fas fa-phone"></i>
+                                        <span class="phone-number">{{ client.phone }}</span>
+                                    {% else %}
+                                        <i class="fas fa-phone-slash"></i>
+                                        <span class="no-phone">No phone</span>
+                                    {% endif %}
                                 </div>
-                            </div>
-                        </td>
-                        <td>
-                            <div>{{ client.phone or 'No phone provided' }}</div>
-                            <div style="color: var(--text-secondary); font-size: 12px;">Contact info</div>
-                        </td>
-                        <td>
-                            <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ client.products }}">
-                                {{ client.products }}
-                            </div>
-                        </td>
-                        <td>
-                            <div style="font-weight: bold; color: #ff6b6b; font-size: 18px;">
-                                P{{ "%.2f"|format(client.remaining_balance) }}
-                            </div>
-                            <div style="color: var(--text-secondary); font-size: 12px;">
-                                of P{{ "%.2f"|format(client.total_amount) }}
-                            </div>
-                        </td>
-                        <td>{{ client.due_date.strftime('%Y-%m-%d') }}</td>
-                        <td>
-                            {% if client.status == 'overdue' %}
-                                <span class="status-badge" style="background: #f44336;">{{ client.status_text }}</span>
-                            {% elif client.status == 'due_today' %}
-                                <span class="status-badge" style="background: #ff9800;">{{ client.status_text }}</span>
-                            {% else %}
-                                <span class="status-badge" style="background: #2196f3;">{{ client.status_text }}</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                <span class="btn" style="background: #4caf50; color: white; padding: 8px 12px; font-size: 12px; cursor: default;" title="Automatic Email Notifications Enabled">
-                                    <i class="fas fa-check-circle"></i> Auto
-                                </span>
-                                <!-- SMS Reminder Button (only if client has phone) --> 
-                                {% if client.phone and client.phone.strip() != '' %}
-                                <button onclick="sendSMSReminder({{ client.id }})" class="btn btn-sms" style="padding: 8px 12px; font-size: 12px;" title="Send FREE SMS to {{ client.phone }}">
-                                    <i class="fas fa-sms"></i> SMS
-                                </button>
-                                {% else %}
-                                <button disabled class="btn" style="background: #ccc; padding: 8px 12px; font-size: 12px; cursor: not-allowed;" title="No phone number">
-                                    <i class="fas fa-phone-slash"></i> No Phone
-                                </button>
-                                {% endif %}
-                                
-                                <!-- Edit Button -->
-                                <button onclick="editClient({{ client.id }})" class="btn btn-primary" style="padding: 8px 12px; font-size: 12px;" title="Edit Client">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
+                            </td>
+                            
+                            <td class="balance-cell">
+                                <div class="balance-container">
+                                    <i class="fas fa-peso-sign"></i>
+                                    <span class="balance-amount">PHP{{ "%.2f" | format(client.remaining_balance) }}</span>
+                                </div>
+                            </td>
+                            
+                            <td class="due-date-cell">
+                                <div class="due-date-container">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span class="due-date">{{ client.due_date }}</span>
+                                </div>
+                            </td>
+                            
+                            <td class="status-cell client-status">
+                                <div class="status-badge">
+                                    <!-- Status populated by JavaScript -->
+                                </div>
+                            </td>
+                            
+                            <td class="actions-cell">
+                                <div class="dashboard-actions">
+                                    <button onclick="sendReminder({{ client.id }})" class="btn btn-sm btn-warning dashboard-btn" title="Send Email Reminder">
+                                        <i class="fas fa-envelope"></i>
+                                        <span class="btn-text">Email</span>
+                                    </button>
+                                    <button onclick="sendSMSReminder({{ client.id }})" class="btn btn-sm btn-sms dashboard-btn" title="Send SMS Reminder">
+                                        <i class="fas fa-sms"></i>
+                                        <span class="btn-text">SMS</span>
+                                    </button>
+                                    <button onclick="markAsPaid({{ client.id }}, '{{ client.name }}')" class="btn btn-sm btn-success dashboard-btn" title="Mark as Paid">
+                                        <i class="fas fa-check"></i>
+                                        <span class="btn-text">Mark Paid</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -366,94 +360,133 @@
     }
 
     // Initialize payment status chart
-    function initPaymentChart() {
-        const ctx = document.getElementById('paymentChart').getContext('2d');
-        
-        // Get chart data from template or use defaults
-        const chartData = {
-            paid: {% if chart_data %}{{ chart_data.paid.percentage }}{% else %}0{% endif %},
-            pending: {% if chart_data %}{{ chart_data.pending.percentage }}{% else %}0{% endif %},
-            overdue: {% if chart_data %}{{ chart_data.overdue.percentage }}{% else %}0{% endif %}
-        };
-        
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Paid', 'Pending', 'Overdue'],
-                datasets: [{
-                    data: [chartData.paid, chartData.pending, chartData.overdue],
-                    backgroundColor: [
-                        '#4caf50',
-                        '#ffc107',
-                        '#f44336'
-                    ],
-                    borderWidth: 0,
-                    cutout: '70%'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label;
-                                const value = context.parsed;
-                                let count = 0;
-                                
-                                {% if chart_data %}
-                                if (label === 'Paid') count = {{ chart_data.paid.count }};
-                                else if (label === 'Pending') count = {{ chart_data.pending.count }};
-                                else if (label === 'Overdue') count = {{ chart_data.overdue.count }};
-                                {% endif %}
-                                
-                                return `${label}: ${count} client${count !== 1 ? 's' : ''} (${value}%)`;
+  function initPaymentChart() {
+    const ctx = document.getElementById('paymentChart');
+    if (!ctx) return; // Exit if chart element doesn't exist
+    
+    const chartCtx = ctx.getContext('2d');
+    
+    // Safely get chart data with defaults
+    let chartData = {
+        paid: 0,
+        pending: 0,
+        overdue: 0
+    };
+
+    // Try to get data from template variables (if available)
+    try {
+        if (typeof window.chartData !== 'undefined' && window.chartData) {
+            chartData = {
+                paid: window.chartData.paid?.percentage || 0,
+                pending: window.chartData.pending?.percentage || 0,
+                overdue: window.chartData.overdue?.percentage || 0
+            };
+        }
+    } catch (e) {
+        console.log('Using default chart data');
+    }
+    
+    new Chart(chartCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Paid', 'Pending', 'Overdue'],
+            datasets: [{
+                data: [chartData.paid, chartData.pending, chartData.overdue],
+                backgroundColor: [
+                    '#4caf50',  // Green for paid
+                    '#ffc107',  // Yellow for pending  
+                    '#f44336'   // Red for overdue
+                ],
+                borderWidth: 0,
+                cutout: '70%'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label;
+                            const value = context.parsed;
+                            let count = 0;
+                            
+                            // Get count from window.chartData if available
+                            try {
+                                if (window.chartData) {
+                                    if (label === 'Paid') count = window.chartData.paid?.count || 0;
+                                    else if (label === 'Pending') count = window.chartData.pending?.count || 0;
+                                    else if (label === 'Overdue') count = window.chartData.overdue?.count || 0;
+                                }
+                            } catch (e) {
+                                count = 0;
                             }
+                            
+                            return `${label}: ${count} client${count !== 1 ? 's' : ''} (${value}%)`;
                         }
                     }
                 }
             }
-        });
-    }
+        }
+    });
+}
 
     // Send reminders to all due clients
-    async function sendAllReminders() {
-        const dueClients = document.querySelectorAll('tbody tr');
-        
-        if (dueClients.length === 0) {
-            showNotification('No clients with due payments found', 'info');
-            return;
-        }
+async function sendAllReminders() {
+    const dueRows = document.querySelectorAll('#duePaymentsTable tbody tr');
+    
+    if (dueRows.length === 0) {
+        showNotification('No clients with due payments found', 'info');
+        return;
+    }
 
-        if (!confirm(`Send reminders to ${dueClients.length} clients?`)) {
-            return;
-        }
+    if (!confirm(`Send email reminders to ${dueRows.length} clients with due payments?`)) {
+        return;
+    }
 
-        let sent = 0;
-        let failed = 0;
+    const button = event.target;
+    const originalHTML = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending All...';
 
-        for (const row of dueClients) {
-            const clientId = row.querySelector('button[onclick^="sendReminder"]')
-                ?.getAttribute('onclick')
-                ?.match(/\d+/)?.[0];
-            
+    let sent = 0;
+    let failed = 0;
+
+    try {
+        for (const row of dueRows) {
+            const clientId = row.dataset.clientId;
             if (clientId) {
-                const result = await makeRequest(`/send_reminder/${clientId}`, 'POST');
-                if (result.success) {
-                    sent++;
-                } else {
+                try {
+                    const result = await makeRequest(`/send_reminder/${clientId}`, 'POST');
+                    if (result.success) {
+                        sent++;
+                    } else {
+                        failed++;
+                    }
+                    // Small delay between requests
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (error) {
                     failed++;
+                    console.error(`Failed to send reminder to client ${clientId}:`, error);
                 }
             }
         }
 
-        showNotification(`Reminders sent: ${sent} successful, ${failed} failed`, 
-                        failed === 0 ? 'success' : 'warning');
+        const message = `Email reminders sent: ${sent} successful${failed > 0 ? `, ${failed} failed` : ''}`;
+        showNotification(message, failed === 0 ? 'success' : 'warning');
+        
+    } catch (error) {
+        console.error('Send all reminders error:', error);
+        showNotification('Error sending reminders', 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
     }
+}
 
     // Edit client (redirect to clients page)
     function editClient(clientId) {
@@ -568,45 +601,45 @@
 
 
     // SMS Functions
-    async function sendSMSReminder(clientId) {
-        const button = event.target.closest('button');
-        const originalHTML = button.innerHTML;
+async function sendSMSReminder(clientId) {
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    
+    try {
+        console.log(`Attempting to send SMS to client ID: ${clientId}`);
         
-        // Show loading state
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        const result = await makeRequest(`/send_sms_reminder/${clientId}`, 'POST');
         
-        try {
-            console.log(`Attempting to send SMS to client ID: ${clientId}`);
+        console.log('SMS Result:', result);
+        
+        if (result.success) {
+            showNotification(result.message || 'FREE SMS reminder sent successfully!', 'success');
             
-            const result = await makeRequest(`/send_sms_reminder/${clientId}`, 'POST');
+            // Update button to show sent status
+            button.style.background = '#4caf50';
+            button.innerHTML = '<i class="fas fa-check"></i> Sent';
             
-            console.log('SMS Result:', result);
-            
-            if (result.success) {
-                showNotification(result.message || 'FREE SMS reminder sent successfully!', 'success');
-                
-                // Update button to show sent status
-                button.style.background = '#4caf50';
-                button.innerHTML = '<i class="fas fa-check"></i> Sent';
-                
-                setTimeout(() => {
-                    button.style.background = '';
-                    button.innerHTML = originalHTML;
-                    button.disabled = false;
-                }, 3000);
-            } else {
-                showNotification(result.message || 'Error sending FREE SMS reminder', 'error');
-                button.disabled = false;
+            setTimeout(() => {
+                button.style.background = '';
                 button.innerHTML = originalHTML;
-            }
-        } catch (error) {
-            console.error('SMS Error:', error);
-            showNotification('Network error sending SMS reminder', 'error');
+                button.disabled = false;
+            }, 3000);
+        } else {
+            showNotification(result.message || 'Error sending FREE SMS reminder', 'error');
             button.disabled = false;
             button.innerHTML = originalHTML;
         }
+    } catch (error) {
+        console.error('SMS Error:', error);
+        showNotification('Network error sending SMS reminder', 'error');
+        button.disabled = false;
+        button.innerHTML = originalHTML;
     }
+}
 
     // Send SMS to all clients with outstanding balances
     async function sendAllSMSReminders() {
@@ -674,128 +707,129 @@
         );
     }
 
-    async function makeRequestWithRetry(url, method = 'GET', data = null, maxRetries = 2) {
-        let lastError;
-        
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                const options = {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                };
-                
-                if (data && (method === 'POST' || method === 'PUT')) {
-                    options.body = JSON.stringify(data);
+async function makeRequestWithRetry(url, method = 'GET', data = null, maxRetries = 2) {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
-                
-                const response = await fetch(url, options);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const result = await response.json();
-                return result;
-                
-            } catch (error) {
-                lastError = error;
-                console.error(`Request attempt ${attempt + 1} failed:`, error);
-                
-                if (attempt < maxRetries) {
-                    // Wait before retry
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-                }
+            };
+            
+            if (data && (method === 'POST' || method === 'PUT')) {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            return result;
+            
+        } catch (error) {
+            lastError = error;
+            console.error(`Request attempt ${attempt + 1} failed:`, error);
+            
+            if (attempt < maxRetries) {
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
             }
         }
-        
-        return { success: false, message: `Network error after ${maxRetries + 1} attempts: ${lastError.message}` };
     }
-     async function loadRecentPaidClients() {
-            try {
-                const result = await makeRequest('/get_recent_paid_clients');
+    
+    return { success: false, message: `Network error after ${maxRetries + 1} attempts: ${lastError.message}` };
+}
+
+  async function loadRecentPaidClients() {
+    try {
+        const result = await makeRequest('/get_recent_paid_clients');
+        
+        const loadingDiv = document.getElementById('loadingActivity');
+        const paidListDiv = document.getElementById('paidClientsList');
+        const noClientsDiv = document.getElementById('noPaidClients');
+        
+        loadingDiv.style.display = 'none';
+        
+        if (result.success && result.clients && result.clients.length > 0) {
+            let paidHTML = '';
+            
+            result.clients.forEach(client => {
+                const paymentDate = new Date(client.created_at);
+                const timeAgo = getTimeAgo(paymentDate);
                 
-                const loadingDiv = document.getElementById('loadingActivity');
-                const paidListDiv = document.getElementById('paidClientsList');
-                const noClientsDiv = document.getElementById('noPaidClients');
-                
-                loadingDiv.style.display = 'none';
-                
-                if (result.success && result.clients && result.clients.length > 0) {
-                    let paidHTML = '';
-                    
-                    result.clients.forEach(client => {
-                        const paymentDate = new Date(client.created_at);
-                        const timeAgo = getTimeAgo(paymentDate);
-                        
-                        paidHTML += `
-                            <div style="display: flex; align-items: center; gap: 15px; padding: 20px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 15px; border-left: 4px solid #4caf50;">
-                                <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #4caf50, #45a049); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
-                                    <i class="fas fa-check"></i>
+                paidHTML += `
+                    <div style="display: flex; align-items: center; gap: 15px; padding: 20px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 15px; border-left: 4px solid #4caf50;">
+                        <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #4caf50, #45a049); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: between; align-items: flex-start; margin-bottom: 8px;">
+                                <div>
+                                    <div style="font-weight: 600; font-size: 16px; color: var(--text-primary);">${client.name}</div>
+                                    <div style="color: var(--text-secondary); font-size: 13px; margin-bottom: 5px;">${client.phone || 'No phone'}</div>
                                 </div>
-                                <div style="flex: 1;">
-                                    <div style="display: flex; justify-content: between; align-items: flex-start; margin-bottom: 8px;">
-                                        <div>
-                                            <div style="font-weight: 600; font-size: 16px; color: var(--text-primary);">${client.name}</div>
-                                            <div style="color: var(--text-secondary); font-size: 13px; margin-bottom: 5px;">${client.phone}</div>
-                                        </div>
-                                        <div style="text-align: right; margin-left: auto;">
-                                            <div style="font-weight: bold; color: #4caf50; font-size: 16px;">PHP${client.total_amount.toLocaleString()}</div>
-                                            <div style="color: var(--text-secondary); font-size: 12px;">${timeAgo}</div>
-                                        </div>
-                                    </div>
-                                    <div style="color: var(--text-secondary); font-size: 14px; line-height: 1.4;">
-                                        <div style="margin-bottom: 3px;"><strong>Products:</strong> ${client.products}</div>
-                                        <div><strong>Due Date:</strong> ${client.due_date}</div>
-                                    </div>
-                                    <div style="margin-top: 10px;">
-                                        <span style="background: #4caf50; color: white; padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600;">
-                                            <i class="fas fa-check-circle"></i> FULLY PAID
-                                        </span>
-                                    </div>
+                                <div style="text-align: right; margin-left: auto;">
+                                    <div style="font-weight: bold; color: #4caf50; font-size: 16px;">P${client.total_amount.toLocaleString()}</div>
+                                    <div style="color: var(--text-secondary); font-size: 12px;">${timeAgo}</div>
                                 </div>
                             </div>
-                        `;
-                    });
-                    
-                    paidListDiv.innerHTML = paidHTML;
-                    paidListDiv.style.display = 'block';
-                    noClientsDiv.style.display = 'none';
-                } else {
-                    paidListDiv.style.display = 'none';
-                    noClientsDiv.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Error loading recent paid clients:', error);
-                document.getElementById('loadingActivity').innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
-                        <p>Error loading recent payments</p>
+                            <div style="color: var(--text-secondary); font-size: 14px; line-height: 1.4;">
+                                <div style="margin-bottom: 3px;"><strong>Products:</strong> ${client.products}</div>
+                                <div><strong>Due Date:</strong> ${client.due_date}</div>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <span style="background: #4caf50; color: white; padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600;">
+                                    <i class="fas fa-check-circle"></i> FULLY PAID
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 `;
-            }
+            });
+            
+            paidListDiv.innerHTML = paidHTML;
+            paidListDiv.style.display = 'block';
+            noClientsDiv.style.display = 'none';
+        } else {
+            paidListDiv.style.display = 'none';
+            noClientsDiv.style.display = 'block';
         }
+    } catch (error) {
+        console.error('Error loading recent paid clients:', error);
+        document.getElementById('loadingActivity').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
+                <p>Error loading recent payments</p>
+            </div>
+        `;
+    }
+}
 
         // Helper function to get time ago
-        function getTimeAgo(date) {
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
+    function getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
 
-            if (diffMins < 60) {
-                return diffMins <= 1 ? 'Just now' : `${diffMins} minutes ago`;
-            } else if (diffHours < 24) {
-                return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-            } else if (diffDays < 7) {
-                return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-            } else {
-                return date.toLocaleDateString();
-            }
+        if (diffMins < 60) {
+            return diffMins <= 1 ? 'Just now' : `${diffMins} minutes ago`;
+        } else if (diffHours < 24) {
+            return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+        } else if (diffDays < 7) {
+            return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+        } else {
+            return date.toLocaleDateString();
         }
+    }
 
         // Real-time notification checking
         async function checkRealTimeNotifications() {
@@ -815,47 +849,113 @@
                 return { success: false };
             }
         }
-        async function loadNotificationStatus() {
-            try {
-                const result = await makeRequest('/get_notification_stats');
-                
-                const loadingDiv = document.getElementById('loadingNotifications');
-                const contentDiv = document.getElementById('notificationContent');
-                
-                loadingDiv.style.display = 'none';
-                
-                if (result.success) {
-                    // Update today's counts
-                    document.getElementById('dueTomorrowCount').textContent = result.today.due_tomorrow || 0;
-                    document.getElementById('dueTodayCount').textContent = result.today.due_today || 0;
-                    document.getElementById('overdueCount').textContent = result.today.overdue || 0;
-                    
-                    // Calculate total week count
-                    const weekTotal = Object.values(result.week).reduce((sum, count) => sum + count, 0);
-                    document.getElementById('totalWeekCount').textContent = weekTotal;
-                    
-                    // Update status to show real-time
-                    document.getElementById('nextCheckTime').textContent = 'Real-time monitoring active';
-                    
-                    contentDiv.style.display = 'block';
-                } else {
-                    loadingDiv.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
-                            <p>Error loading notification status</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading notification status:', error);
-                document.getElementById('loadingNotifications').innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
-                        <p>Network error loading status</p>
-                    </div>
-                `;
-            }
+
+async function loadNotificationStatus() {
+    try {
+        const result = await makeRequest('/get_notification_stats');
+        
+        const loadingDiv = document.getElementById('loadingNotifications');
+        const contentDiv = document.getElementById('notificationContent');
+        
+        loadingDiv.style.display = 'none';
+        
+        if (result.success) {
+            // Update today's counts
+            document.getElementById('dueTomorrowCount').textContent = result.today.due_tomorrow || 0;
+            document.getElementById('dueTodayCount').textContent = result.today.due_today || 0;
+            document.getElementById('overdueCount').textContent = result.today.overdue || 0;
+            
+            // Calculate total week count
+            const weekTotal = Object.values(result.week).reduce((sum, count) => sum + count, 0);
+            document.getElementById('totalWeekCount').textContent = weekTotal;
+            
+            // Update last check time
+            document.getElementById('lastCheckTime').textContent = new Date().toLocaleTimeString();
+            
+            contentDiv.style.display = 'block';
+        } else {
+            loadingDiv.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
+                    <p>Error loading notification status</p>
+                </div>
+            `;
         }
+    } catch (error) {
+        console.error('Error loading notification status:', error);
+        document.getElementById('loadingNotifications').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff6b6b;"></i>
+                <p>Network error loading status</p>
+            </div>
+        `;
+    }
+}
+
+async function sendReminder(clientId) {
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    
+    try {
+        const result = await makeRequest(`/send_reminder/${clientId}`, 'POST');
+        
+        if (result.success) {
+            showNotification(result.message || 'Reminder sent successfully!', 'success');
+        } else {
+            showNotification(result.message || 'Error sending reminder', 'error');
+        }
+    } catch (error) {
+        console.error('Send reminder error:', error);
+        showNotification('Network error sending reminder', 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+    }
+}
+
+// Add function to handle mark as paid from dashboard
+async function markAsPaid(clientId, clientName) {
+    if (!confirm(`Mark ${clientName} as fully paid?\n\nThis will set the remaining balance to 0.`)) {
+        return;
+    }
+    
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    
+    try {
+        const result = await makeRequest(`/mark_as_paid/${clientId}`, 'PUT');
+        
+        if (result.success) {
+            showNotification(result.message || 'Client marked as paid successfully!', 'success');
+            // Update the UI immediately
+            const row = button.closest('tr');
+            if (row) {
+                const statusCell = row.querySelector('.client-status');
+                if (statusCell) {
+                    statusCell.innerHTML = '<span class="status-badge" style="background: #4caf50;"><i class="fas fa-check"></i> Fully Paid</span>';
+                }
+                // Hide the row after a short delay since it's no longer due
+                setTimeout(() => {
+                    row.style.display = 'none';
+                }, 2000);
+            }
+        } else {
+            showNotification(result.message || 'Error marking client as paid', 'error');
+        }
+    } catch (error) {
+        console.error('Mark as paid error:', error);
+        showNotification('Network error marking client as paid', 'error');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+    }
+}
 
 function updateNextCheckTime() {
     const now = new Date();
@@ -896,6 +996,7 @@ function updateNextCheckTime() {
     
     document.getElementById('nextCheckTime').textContent = isToday ? timeString : `Tomorrow ${timeString}`;
 }
+
 function showNotificationUpdate(message, count = null) {
     const notification = document.createElement('div');
     notification.style.cssText = `
@@ -941,9 +1042,35 @@ const additionalStyles = `
         from { transform: translateY(0); opacity: 1; }
         to { transform: translateY(100%); opacity: 0; }
     }
+    
+    .btn-sms {
+        background: linear-gradient(135deg, #4caf50, #45a049);
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-sms:hover {
+        background: linear-gradient(135deg, #45a049, #3d8b40);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .btn-sms:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
 `;
 
-// Append additional styles
+
+
+// Append additional styles to existing style element or create new one
 const existingStyle = document.querySelector('style');
 if (existingStyle) {
     existingStyle.textContent += additionalStyles;
@@ -952,5 +1079,7 @@ if (existingStyle) {
     newStyle.textContent = additionalStyles;
     document.head.appendChild(newStyle);
 }
+
+window.chartData = {{ chart_data | tojson | safe }};
 </script>
 {% endblock %}

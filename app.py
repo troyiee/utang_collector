@@ -1,7 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from flask_mysqldb import MySQL
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, g
 from werkzeug.security import generate_password_hash, check_password_hash
-import MySQLdb.cursors
 from datetime import datetime, timedelta, date
 import re
 import random
@@ -12,6 +10,10 @@ import json
 from functools import wraps
 import os
 from dotenv import load_dotenv
+from threading import Thread
+import time
+import sqlite3
+
 
 # Load environment variables
 load_dotenv()
@@ -19,23 +21,79 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'fallback-secret-key')
 
-# MySQL configurations (use environment variables for deployment)
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'debt_collection')
-app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', '3306'))
+# SQLite configuration
+DATABASE = os.getenv('DATABASE', 'debt_collection.db')
 
-# Optional SSL CA for managed MySQL providers (e.g., PlanetScale)
-mysql_ssl_ca = os.getenv('MYSQL_SSL_CA')
-if mysql_ssl_ca:
-    app.config['MYSQL_SSL_CA'] = mysql_ssl_ca
-
-mysql = MySQL(app)
-    
 # Brevo API configuration
 BREVO_API_KEY = os.getenv('BREVO_API_KEY')
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+
+def get_db():
+    """Get database connection"""
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row  # This enables column access by name
+    return g.db
+
+def close_db(e=None):
+    """Close database connection"""
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+def init_db():
+    """Initialize the database with required tables"""
+    db = get_db()
+    
+    # Create admins table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create clients table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            phone TEXT,
+            products TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            remaining_balance REAL NOT NULL,
+            due_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (admin_id) REFERENCES admins (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create SMS reminders table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS sms_reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            method TEXT NOT NULL DEFAULT 'email_gateway',
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    db.commit()
+
+@app.before_request
+def before_request():
+    """Initialize database connection before each request"""
+    get_db()
+
+@app.teardown_appcontext
+def close_db_connection(exception):
+    """Close database connection after each request"""
+    close_db()
 
 @app.context_processor
 def inject_date():
@@ -183,39 +241,15 @@ def send_sms_via_email_gateway(phone, message, carrier):
     
     return success
 
-# Create SMS reminders table if it doesn't exist
-def create_sms_reminders_table():
-    """Create SMS reminders table if it doesn't exist"""
-    try:
-        cursor = mysql.connection.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS sms_reminders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                client_id INT NOT NULL,
-                method VARCHAR(50) NOT NULL DEFAULT 'email_gateway',
-                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-            )
-        ''')
-        mysql.connection.commit()
-        cursor.close()
-        print("SMS reminders table created/verified successfully")
-    except Exception as e:
-        print(f"Error creating SMS reminders table: {e}")
-
-with app.app_context():
-    create_sms_reminders_table()
-    
-
 @app.route('/check_sms_eligible_clients', methods=['GET'])
 @login_required
 def check_sms_eligible_clients():
     """Check how many clients are eligible for SMS reminders"""
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        cursor = db.execute('''
             SELECT COUNT(*) as count FROM clients 
-            WHERE admin_id = %s 
+            WHERE admin_id = ? 
             AND phone IS NOT NULL 
             AND phone != '' 
             AND remaining_balance > 0
@@ -238,7 +272,7 @@ def check_sms_eligible_clients():
             'message': 'Error checking eligible clients'
         })
         
-# Replace the detect_carrier function in app.py
+# Replace the detect_carrier function
 def detect_carrier(phone):
     clean = ''.join(filter(str.isdigit, phone))
     
@@ -292,10 +326,10 @@ def detect_carrier(phone):
 @login_required
 def get_recent_paid_clients():
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        cursor = db.execute('''
             SELECT * FROM clients 
-            WHERE admin_id = %s AND remaining_balance <= 0 
+            WHERE admin_id = ? AND remaining_balance <= 0 
             ORDER BY created_at DESC 
             LIMIT 5
         ''', (session['admin_id'],))
@@ -311,8 +345,8 @@ def get_recent_paid_clients():
                 'phone': client['phone'] or 'N/A',
                 'total_amount': float(client['total_amount']),
                 'products': client['products'],
-                'due_date': client['due_date'].strftime('%Y-%m-%d') if client['due_date'] else 'N/A',
-                'created_at': client['created_at'].strftime('%Y-%m-%d %H:%M') if client['created_at'] else 'N/A'
+                'due_date': client['due_date'] if client['due_date'] else 'N/A',
+                'created_at': client['created_at'] if client['created_at'] else 'N/A'
             })
         
         return jsonify({
@@ -332,8 +366,8 @@ def get_recent_paid_clients():
 @login_required
 def send_sms_reminder(client_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM clients WHERE id = %s AND admin_id = %s', (client_id, session['admin_id']))
+        db = get_db()
+        cursor = db.execute('SELECT * FROM clients WHERE id = ? AND admin_id = ?', (client_id, session['admin_id']))
         client = cursor.fetchone()
         
         print(f"=== SMS DEBUG: Client lookup for ID {client_id} ===")
@@ -396,9 +430,9 @@ def send_sms_reminder(client_id):
         if sms_sent:
             # Log the SMS reminder
             try:
-                cursor.execute('INSERT INTO sms_reminders (client_id, method, sent_at) VALUES (%s, %s, NOW())', 
-                             (client['id'], 'email_gateway'))
-                mysql.connection.commit()
+                db.execute('INSERT INTO sms_reminders (client_id, method, sent_at) VALUES (?, ?, ?)', 
+                          (client['id'], 'email_gateway', datetime.now().isoformat()))
+                db.commit()
                 print(f"✓ SMS reminder logged successfully")
             except Exception as log_error:
                 print(f"Warning: Failed to log SMS reminder: {log_error}")
@@ -420,16 +454,15 @@ def send_sms_reminder(client_id):
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Failed to send SMS reminder: {str(e)}'})
 
-    
 @app.route('/send_all_sms_reminders', methods=['POST'])
 @login_required
 def send_all_sms_reminders():
     """Send SMS reminders to all clients with outstanding balances and phone numbers"""
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        cursor = db.execute('''
             SELECT * FROM clients 
-            WHERE admin_id = %s 
+            WHERE admin_id = ? 
             AND phone IS NOT NULL 
             AND phone != '' 
             AND remaining_balance > 0
@@ -456,10 +489,11 @@ def send_all_sms_reminders():
             today = date.today()
             days_diff = None
             if client['due_date']:
-                client_due_date = client['due_date']
-                if isinstance(client_due_date, str):
-                    client_due_date = datetime.strptime(client_due_date, '%Y-%m-%d').date()
-                days_diff = (client_due_date - today).days
+                try:
+                    client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+                    days_diff = (client_due_date - today).days
+                except ValueError:
+                    pass
             
             # Create SMS message
             if days_diff is not None:
@@ -501,9 +535,9 @@ Please settle ASAP. Thank you!"""
                 sent_count += 1
                 # Log the SMS reminder
                 try:
-                    cursor.execute('INSERT INTO sms_reminders (client_id, method, sent_at) VALUES (%s, %s, NOW())', 
-                                 (client['id'], 'email_gateway'))
-                    mysql.connection.commit()
+                    db.execute('INSERT INTO sms_reminders (client_id, method, sent_at) VALUES (?, ?, ?)', 
+                              (client['id'], 'email_gateway', datetime.now().isoformat()))
+                    db.commit()
                 except Exception as log_error:
                     print(f"Warning: Failed to log SMS reminder: {log_error}")
             else:
@@ -538,8 +572,8 @@ def register():
             email = data['email']
             password = data['password']
             
-            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('SELECT * FROM admins WHERE email = %s', (email,))
+            db = get_db()
+            cursor = db.execute('SELECT * FROM admins WHERE email = ?', (email,))
             account = cursor.fetchone()
             
             if account:
@@ -598,10 +632,10 @@ def verify_otp():
         
         if otp == temp_data['otp']:
             # Create account
-            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('INSERT INTO admins VALUES (NULL, %s, %s, %s, NOW())', 
-                          (temp_data['username'], temp_data['email'], temp_data['password']))
-            mysql.connection.commit()
+            db = get_db()
+            db.execute('INSERT INTO admins (username, email, password) VALUES (?, ?, ?)', 
+                      (temp_data['username'], temp_data['email'], temp_data['password']))
+            db.commit()
             
             # Clean up session
             session.pop('temp_registration', None)
@@ -621,8 +655,8 @@ def login():
             email = data['email']
             password = data['password']
             
-            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('SELECT * FROM admins WHERE email = %s', (email,))
+            db = get_db()
+            cursor = db.execute('SELECT * FROM admins WHERE email = ?', (email,))
             account = cursor.fetchone()
             
             if account and check_password_hash(account['password'], password):
@@ -641,23 +675,25 @@ def login():
 @login_required
 def dashboard():
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        db = get_db()
         
         # Get statistics
-        cursor.execute('SELECT COUNT(*) as total_clients FROM clients WHERE admin_id = %s', (session['admin_id'],))
+        cursor = db.execute('SELECT COUNT(*) as total_clients FROM clients WHERE admin_id = ?', (session['admin_id'],))
         total_clients = cursor.fetchone()['total_clients']
         
-        cursor.execute('SELECT SUM(total_amount) as total_debt FROM clients WHERE admin_id = %s', (session['admin_id'],))
-        total_debt = cursor.fetchone()['total_debt'] or 0
+        cursor = db.execute('SELECT SUM(total_amount) as total_debt FROM clients WHERE admin_id = ?', (session['admin_id'],))
+        result = cursor.fetchone()
+        total_debt = result['total_debt'] if result['total_debt'] else 0
         
-        cursor.execute('SELECT SUM(remaining_balance) as total_outstanding FROM clients WHERE admin_id = %s', (session['admin_id'],))
-        total_outstanding = cursor.fetchone()['total_outstanding'] or 0
+        cursor = db.execute('SELECT SUM(remaining_balance) as total_outstanding FROM clients WHERE admin_id = ?', (session['admin_id'],))
+        result = cursor.fetchone()
+        total_outstanding = result['total_outstanding'] if result['total_outstanding'] else 0
         
         # Get all clients for chart calculation
-        cursor.execute('SELECT * FROM clients WHERE admin_id = %s', (session['admin_id'],))
+        cursor = db.execute('SELECT * FROM clients WHERE admin_id = ?', (session['admin_id'],))
         all_clients = cursor.fetchall()
         
-        # Calculate chart data (replace the existing chart calculation section)
+        # Calculate chart data
         today = datetime.now().date()
         paid_count = 0
         pending_count = 0
@@ -667,15 +703,18 @@ def dashboard():
             if client['remaining_balance'] <= 0:
                 paid_count += 1
             elif client['due_date']:
-                client_due_date = client['due_date']
-                if isinstance(client_due_date, str):
-                    client_due_date = datetime.strptime(client_due_date, '%Y-%m-%d').date()
-                
-                days_diff = (client_due_date - today).days
-                if days_diff < 0:
-                    overdue_count += 1
-                else:
-                    pending_count += 1
+                try:
+                    client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+                    days_diff = (client_due_date - today).days
+                    if days_diff < 0:
+                        overdue_count += 1
+                    else:
+                        pending_count += 1
+                except ValueError:
+                    if client['remaining_balance'] > 0:
+                        pending_count += 1
+                    else:
+                        paid_count += 1
             else:
                 # No due date but has remaining balance
                 if client['remaining_balance'] > 0:
@@ -683,7 +722,7 @@ def dashboard():
                 else:
                     paid_count += 1
 
-        # Calculate percentages for chart - ensure they add up to 100
+        # Calculate percentages for chart
         if total_clients > 0:
             paid_percentage = round((paid_count / total_clients) * 100, 1)
             pending_percentage = round((pending_count / total_clients) * 100, 1)
@@ -713,31 +752,37 @@ def dashboard():
         yesterday = today - timedelta(days=1)
         tomorrow = today + timedelta(days=1)
         
-        cursor.execute('''
+        cursor = db.execute('''
             SELECT * FROM clients 
-            WHERE admin_id = %s AND due_date IN (%s, %s, %s) AND remaining_balance > 0
+            WHERE admin_id = ? AND due_date IN (?, ?, ?) AND remaining_balance > 0
             ORDER BY due_date
-        ''', (session['admin_id'], yesterday, today, tomorrow))
+        ''', (session['admin_id'], yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
+        
         due_clients = cursor.fetchall()
         
         # Add status calculation for each due client
         for client in due_clients:
             if client['due_date']:
-                client_due_date = client['due_date']
-                if isinstance(client_due_date, str):
-                    client_due_date = datetime.strptime(client_due_date, '%Y-%m-%d').date()
-                
-                days_diff = (client_due_date - today).days
-                
-                if days_diff < 0:
-                    client['status'] = 'overdue'
-                    client['status_text'] = 'Overdue'
-                elif days_diff == 0:
-                    client['status'] = 'due_today'
-                    client['status_text'] = 'Due Today'
-                else:
-                    client['status'] = 'due_tomorrow'
-                    client['status_text'] = 'Due Tomorrow'
+                try:
+                    client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+                    days_diff = (client_due_date - today).days
+                    
+                    if days_diff < 0:
+                        client = dict(client)
+                        client['status'] = 'overdue'
+                        client['status_text'] = 'Overdue'
+                    elif days_diff == 0:
+                        client = dict(client)
+                        client['status'] = 'due_today'
+                        client['status_text'] = 'Due Today'
+                    else:
+                        client = dict(client)
+                        client['status'] = 'due_tomorrow'
+                        client['status_text'] = 'Due Tomorrow'
+                except ValueError:
+                    client = dict(client)
+                    client['status'] = 'pending'
+                    client['status_text'] = 'Pending'
         
         stats = {
             'total_clients': total_clients,
@@ -768,8 +813,8 @@ def dashboard():
 @login_required
 def clients():
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM clients WHERE admin_id = %s ORDER BY created_at DESC', (session['admin_id'],))
+        db = get_db()
+        cursor = db.execute('SELECT * FROM clients WHERE admin_id = ? ORDER BY created_at DESC', (session['admin_id'],))
         clients = cursor.fetchall()
         
         # Add days_diff calculation for each client
@@ -780,22 +825,27 @@ def clients():
         pending_count = 0
         overdue_count = 0
         
+        clients_list = []
         for client in clients:
+            client_dict = dict(client)
             if client['due_date']:
-                client_due_date = client['due_date']
-                if isinstance(client_due_date, str):
-                    client_due_date = datetime.strptime(client_due_date, '%Y-%m-%d').date()
-                client['days_diff'] = (client_due_date - today).days
+                try:
+                    client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+                    client_dict['days_diff'] = (client_due_date - today).days
+                except ValueError:
+                    client_dict['days_diff'] = None
             else:
-                client['days_diff'] = None
+                client_dict['days_diff'] = None
             
             # Calculate chart data based on payment status
             if client['remaining_balance'] <= 0:
                 paid_count += 1
-            elif client['days_diff'] is not None and client['days_diff'] < 0:
+            elif client_dict['days_diff'] is not None and client_dict['days_diff'] < 0:
                 overdue_count += 1
             else:
                 pending_count += 1
+            
+            clients_list.append(client_dict)
         
         # Calculate percentages for chart
         total_clients = len(clients)
@@ -817,7 +867,7 @@ def clients():
             'overdue': {'count': overdue_count, 'percentage': overdue_percentage}
         }
         
-        return render_template('clients.html', clients=clients, chart_data=chart_data)
+        return render_template('clients.html', clients=clients_list, chart_data=chart_data)
     except Exception as e:
         print(f"Clients error: {e}")
         return render_template('clients.html', clients=[], chart_data={
@@ -831,13 +881,13 @@ def clients():
 @login_required
 def mark_as_paid(client_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        db.execute('''
             UPDATE clients 
             SET remaining_balance = 0
-            WHERE id = %s AND admin_id = %s
+            WHERE id = ? AND admin_id = ?
         ''', (client_id, session['admin_id']))
-        mysql.connection.commit()
+        db.commit()
         
         return jsonify({'success': True, 'message': 'Client marked as fully paid!'})
     except Exception as e:
@@ -850,10 +900,10 @@ def add_client():
     try:
         data = request.get_json()
         
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        db.execute('''
             INSERT INTO clients (admin_id, name, phone, products, total_amount, remaining_balance, due_date) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             session['admin_id'],
             data['name'],
@@ -863,7 +913,7 @@ def add_client():
             data['remaining_balance'],
             data['due_date']
         ))
-        mysql.connection.commit()
+        db.commit()
         
         return jsonify({'success': True, 'message': 'Client added successfully!'})
     except Exception as e:
@@ -876,12 +926,12 @@ def update_client(client_id):
     try:
         data = request.get_json()
         
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('''
+        db = get_db()
+        db.execute('''
             UPDATE clients 
-            SET name = %s, phone = %s, products = %s, 
-                total_amount = %s, remaining_balance = %s, due_date = %s
-            WHERE id = %s AND admin_id = %s
+            SET name = ?, phone = ?, products = ?, 
+                total_amount = ?, remaining_balance = ?, due_date = ?
+            WHERE id = ? AND admin_id = ?
         ''', (
             data['name'],
             data['phone'],
@@ -892,7 +942,7 @@ def update_client(client_id):
             client_id,
             session['admin_id']
         ))
-        mysql.connection.commit()
+        db.commit()
         
         return jsonify({'success': True, 'message': 'Client updated successfully!'})
     except Exception as e:
@@ -903,9 +953,9 @@ def update_client(client_id):
 @login_required
 def delete_client(client_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('DELETE FROM clients WHERE id = %s AND admin_id = %s', (client_id, session['admin_id']))
-        mysql.connection.commit()
+        db = get_db()
+        db.execute('DELETE FROM clients WHERE id = ? AND admin_id = ?', (client_id, session['admin_id']))
+        db.commit()
         
         return jsonify({'success': True, 'message': 'Client deleted successfully!'})
     except Exception as e:
@@ -916,15 +966,15 @@ def delete_client(client_id):
 @login_required
 def send_reminder(client_id):
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM clients WHERE id = %s AND admin_id = %s', (client_id, session['admin_id']))
+        db = get_db()
+        cursor = db.execute('SELECT * FROM clients WHERE id = ? AND admin_id = ?', (client_id, session['admin_id']))
         client = cursor.fetchone()
         
         if not client:
             return jsonify({'success': False, 'message': 'Client not found!'})
         
         # Get admin email for sending reminders
-        cursor.execute('SELECT email FROM admins WHERE id = %s', (session['admin_id'],))
+        cursor = db.execute('SELECT email FROM admins WHERE id = ?', (session['admin_id'],))
         admin = cursor.fetchone()
         admin_email = admin['email'] if admin else None
         
@@ -964,45 +1014,202 @@ def send_reminder(client_id):
 @login_required
 def check_due_payments():
     try:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        db = get_db()
         
         # Get clients with payments due today, yesterday, or tomorrow
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         tomorrow = today + timedelta(days=1)
         
-        cursor.execute('''
+        cursor = db.execute('''
             SELECT * FROM clients 
-            WHERE admin_id = %s AND due_date IN (%s, %s, %s) AND remaining_balance > 0
-        ''', (session['admin_id'], yesterday, today, tomorrow))
+            WHERE admin_id = ? AND due_date IN (?, ?, ?) AND remaining_balance > 0
+        ''', (session['admin_id'], yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
         
         due_clients = cursor.fetchall()
         
         notifications = []
         for client in due_clients:
-            if client['due_date'] == yesterday:
-                status = 'overdue'
-                message = f"{client['name']}'s payment was due yesterday (PHP{client['remaining_balance']})"
-            elif client['due_date'] == today:
-                status = 'due_today'
-                message = f"{client['name']}'s payment is due today (PHP{client['remaining_balance']})"
-            else:
-                status = 'due_tomorrow'
-                message = f"{client['name']}'s payment is due tomorrow (PHP{client['remaining_balance']})"
-            
-            notifications.append({
-                'client_id': client['id'],
-                'client_name': client['name'],
-                'amount': client['remaining_balance'],
-                'due_date': client['due_date'].strftime('%Y-%m-%d'),
-                'status': status,
-                'message': message
-            })
+            try:
+                client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+                if client_due_date == yesterday:
+                    status = 'overdue'
+                    message = f"{client['name']}'s payment was due yesterday (PHP{client['remaining_balance']})"
+                elif client_due_date == today:
+                    status = 'due_today'
+                    message = f"{client['name']}'s payment is due today (PHP{client['remaining_balance']})"
+                else:
+                    status = 'due_tomorrow'
+                    message = f"{client['name']}'s payment is due tomorrow (PHP{client['remaining_balance']})"
+                
+                notifications.append({
+                    'client_id': client['id'],
+                    'client_name': client['name'],
+                    'amount': client['remaining_balance'],
+                    'due_date': client['due_date'],
+                    'status': status,
+                    'message': message
+                })
+            except ValueError:
+                continue
         
         return jsonify({'notifications': notifications})
     except Exception as e:
         print(f"Check due payments error: {e}")
         return jsonify({'notifications': []})
+
+def run_payment_notifications():
+    """Background task to automatically send payment notifications"""
+    def should_send_notifications():
+        """Check if current time matches notification schedule"""
+        current_hour = datetime.now().hour
+        return current_hour in [8, 14, 18]  # 8 AM, 2 PM, 6 PM
+    
+    def job():
+        try:
+            with app.app_context():
+                db = get_db()
+                cursor = db.execute('SELECT id, email FROM admins')
+                admins = cursor.fetchall()
+                
+                for admin in admins:
+                    notifications_sent = check_payment_status_for_admin(admin['id'], admin['email'])
+                    if notifications_sent > 0:
+                        print(f"✅ Sent {notifications_sent} automatic notifications to {admin['email']}")
+        except Exception as e:
+            print(f"❌ Automatic notification error: {e}")
+    
+    last_check_hour = -1
+    print("🔄 Automatic notification system running...")
+    
+    while True:
+        try:
+            current_hour = datetime.now().hour
+            
+            # Only run once per hour at the scheduled times
+            if should_send_notifications() and current_hour != last_check_hour:
+                print(f"📧 Running automatic notification check at {datetime.now().strftime('%H:%M:%S')}")
+                job()
+                last_check_hour = current_hour
+            
+            # Check every 10 minutes
+            time.sleep(600)
+        except Exception as e:
+            print(f"❌ Notification scheduler error: {e}")
+            time.sleep(600)  # Continue running even if there's an error
+
+def check_payment_status_for_admin(admin_id, admin_email):
+    """Check payment status for specific admin and send notifications"""
+    try:
+        db = get_db()
+        
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        yesterday = today - timedelta(days=1)
+        
+        # Get clients due today, tomorrow, or overdue for this admin
+        cursor = db.execute('''
+            SELECT * FROM clients 
+            WHERE admin_id = ? 
+            AND due_date IN (?, ?, ?) 
+            AND remaining_balance > 0
+        ''', (admin_id, yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
+        
+        due_clients = cursor.fetchall()
+        
+        notifications_sent = 0
+        for client in due_clients:
+            if send_automatic_payment_notification(client, admin_email):
+                notifications_sent += 1
+                time.sleep(1)  # Small delay between emails
+        
+        return notifications_sent
+    except Exception as e:
+        print(f"❌ Payment status check error for admin {admin_id}: {e}")
+        return 0
+
+def send_automatic_payment_notification(client, admin_email):
+    """Send automatic Gmail notification for client payment status"""
+    try:
+        today = date.today()
+        try:
+            client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return False
+        
+        days_diff = (client_due_date - today).days
+        
+        # Determine status and email content
+        if days_diff < 0:
+            status = "OVERDUE"
+            urgency_color = "#f44336"
+            status_icon = "⚠️"
+            priority = "HIGH PRIORITY"
+        elif days_diff == 0:
+            status = "DUE TODAY"
+            urgency_color = "#ff9800"
+            status_icon = "🔔"
+            priority = "URGENT"
+        else:
+            status = "DUE TOMORROW"
+            urgency_color = "#2196f3"
+            status_icon = "📅"
+            priority = "REMINDER"
+        
+        html_content = f"""
+        <div style="background: linear-gradient(135deg, {urgency_color} 0%, {urgency_color}dd 100%); padding: 30px; font-family: Arial, sans-serif;">
+            <div style="background: white; border-radius: 15px; padding: 30px; max-width: 600px; margin: 0 auto; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+                <h2 style="color: {urgency_color}; text-align: center; margin-bottom: 10px;">{status_icon} AUTOMATIC PAYMENT ALERT</h2>
+                <p style="text-align: center; background: {urgency_color}; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-weight: bold; font-size: 12px; margin-bottom: 20px;">{priority}</p>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 5px solid {urgency_color};">
+                    <h3 style="color: #333; margin-top: 0;">Client: {client['name']}</h3>
+                    <p style="margin: 8px 0;"><strong>Phone:</strong> {client['phone'] or 'Not provided'}</p>
+                    <p style="margin: 8px 0;"><strong>Products:</strong> {client['products']}</p>
+                </div>
+                
+                <div style="background: #fff3cd; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h3 style="color: #856404; margin-top: 0;">Payment Status: {status}</h3>
+                    <p style="margin: 8px 0;"><strong>Due Date:</strong> {client['due_date']}</p>
+                    <p style="margin: 8px 0;"><strong>Total Amount:</strong> PHP{client['total_amount']:,.2f}</p>
+                    <p style="margin: 8px 0; font-size: 18px;"><strong style="color: {urgency_color};">Outstanding Balance: PHP{client['remaining_balance']:,.2f}</strong></p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+                    <p style="color: #1976d2; margin: 0; font-size: 14px;">
+                        <strong>⏰ Sent automatically at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</strong>
+                    </p>
+                    <p style="color: #666; margin: 5px 0 0 0; font-size: 12px;">
+                        Debt Collection System - Automatic Notifications
+                    </p>
+                </div>
+            </div>
+        </div>
+        """
+        
+        subject = f"[AUTO-ALERT] {status} - {client['name']} (PHP{client['remaining_balance']:,.2f})"
+        
+        success = send_email_brevo(admin_email, subject, html_content)
+        if success:
+            print(f"📧 Sent {status} notification for {client['name']} to {admin_email}")
+        
+        return success
+        
+    except Exception as e:
+        print(f"❌ Send automatic notification error: {e}")
+        return False
+
+# Start automatic notification system
+def start_notification_scheduler():
+    """Start the background notification system"""
+    try:
+        notification_thread = Thread(target=run_payment_notifications, daemon=True)
+        notification_thread.start()
+        print("✅ Automatic payment notification system started!")
+        print("📧 Will check and send notifications at 8:00 AM, 2:00 PM, and 6:00 PM daily")
+        print("🔄 Notification system is now running in the background...")
+    except Exception as e:
+        print(f"❌ Failed to start notification system: {e}")
 
 @app.route('/logout')
 def logout():
@@ -1010,6 +1217,104 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
+@app.route('/get_notification_stats')
+@login_required
+def get_notification_stats():
+    try:
+        db = get_db()
+        
+        today = date.today()
+        tomorrow = today + timedelta(days=1)
+        week_ago = today - timedelta(days=7)
+        
+        # Count notifications for today
+        cursor = db.execute('''
+            SELECT COUNT(*) as count FROM clients 
+            WHERE admin_id = ? AND due_date = ? AND remaining_balance > 0
+        ''', (session['admin_id'], today.strftime('%Y-%m-%d')))
+        due_today_count = cursor.fetchone()['count']
+        
+        cursor = db.execute('''
+            SELECT COUNT(*) as count FROM clients 
+            WHERE admin_id = ? AND due_date = ? AND remaining_balance > 0
+        ''', (session['admin_id'], tomorrow.strftime('%Y-%m-%d')))
+        due_tomorrow_count = cursor.fetchone()['count']
+        
+        cursor = db.execute('''
+            SELECT COUNT(*) as count FROM clients 
+            WHERE admin_id = ? AND due_date < ? AND remaining_balance > 0
+        ''', (session['admin_id'], today.strftime('%Y-%m-%d')))
+        overdue_count = cursor.fetchone()['count']
+        
+        # Count total notifications for this week
+        cursor = db.execute('''
+            SELECT COUNT(*) as count FROM clients 
+            WHERE admin_id = ? AND due_date >= ? AND due_date <= ? AND remaining_balance > 0
+        ''', (session['admin_id'], week_ago.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')))
+        week_total = cursor.fetchone()['count']
+        
+        return jsonify({
+            'success': True,
+            'today': {
+                'due_today': due_today_count,
+                'due_tomorrow': due_tomorrow_count,
+                'overdue': overdue_count
+            },
+            'week': {
+                'total': week_total
+            }
+        })
+        
+    except Exception as e:
+        print(f"Get notification stats error: {e}")
+        return jsonify({
+            'success': False, 
+            'message': f'Error getting notification stats: {str(e)}'
+        })
+
+@app.route('/check_due_status_changes')
+@login_required
+def check_due_status_changes():
+    try:
+        db = get_db()
+        
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        tomorrow = today + timedelta(days=1)
+        
+        # Check for clients with status changes (this is a simplified version)
+        cursor = db.execute('''
+            SELECT COUNT(*) as count FROM clients 
+            WHERE admin_id = ? AND due_date IN (?, ?, ?) AND remaining_balance > 0
+        ''', (session['admin_id'], yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
+        
+        current_notifications = cursor.fetchone()['count']
+        
+        # For real-time updates, you would compare with previous counts
+        # For now, we'll just return the current status
+        return jsonify({
+            'success': True,
+            'has_new_notifications': False,  # Set to True when you detect changes
+            'notifications_sent': current_notifications
+        })
+        
+    except Exception as e:
+        print(f"Check due status changes error: {e}")
+        return jsonify({
+            'success': False,
+            'has_new_notifications': False,
+            'notifications_sent': 0
+        })
+
+# Initialize database on startup
+with app.app_context():
+    init_db()
+
+# Initialize automatic notifications when app starts
+try:
+    start_notification_scheduler()
+except Exception as e:
+    print(f"Warning: Could not start automatic notifications: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)

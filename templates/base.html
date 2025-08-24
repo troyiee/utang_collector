@@ -53,6 +53,86 @@
             padding: 30px;
             margin: 20px 0;
         }
+        .due-payment-row {
+            transition: all 0.3s ease;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .due-payment-row:hover {
+            background: var(--glass-bg);
+            transform: translateX(5px);
+        }
+        .client-name-container,
+        .phone-container,
+        .balance-container,
+        .due-date-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .client-name-container i,
+        .phone-container i,
+        .balance-container i,
+        .due-date-container i {
+            width: 16px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .client-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .phone-number {
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .no-phone {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .balance-amount {
+            font-weight: 700;
+            color: #ff6b6b;
+            font-family: 'Courier New', monospace;
+        }
+
+        .due-date {
+            color: var(--text-primary);
+        }
+        .dashboard-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-width: fit-content;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .dashboard-btn i {
+            font-size: 11px;
+        }
+
+        .btn-text {
+            font-size: 11px;
+            font-weight: 600;
+        }
 
         .btn {
             padding: 12px 30px;
@@ -396,6 +476,7 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: inline-block;
         }
 
         .status-overdue {
@@ -416,66 +497,130 @@
             border: 1px solid #2196f3;
         }
 
-        @media (max-width: 768px) {
-            /* Keep logo and toggle on one row; menu spans below */
-            .navbar-content {
-                display: grid;
-                grid-template-columns: 1fr auto;
-                align-items: center;
-                gap: 10px;
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 0 20px;
-            }
-            .nav-toggle {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                justify-self: end;
-            }
-            .nav-menu {
-                grid-column: 1 / -1;
-                flex-direction: column;
-                gap: 12px;
-                width: 100%;
-                display: none;
-                padding-top: 8px;
-            }
-            .nav-menu.open { display: flex; }
-            .nav-menu li a,
-            .nav-menu .nav-link {
-                width: 100%;
-                display: block;
-                padding: 10px 12px;
-                border-radius: 10px;
-                background: var(--glass-bg);
-            }
-            .nav-link.active::after { display: none; }
-
-            .logo { font-size: 24px; line-height: 1.2; }
-            .logo i { margin-right: 8px; }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .modal-content {
-                width: 95%;
-                margin: 10% auto;
-                padding: 20px;
-            }
-
-            .container {
-                padding: 10px;
-            }
-
-            .glass-card {
-                padding: 20px;
-            }
+      @media (max-width: 768px) {
+        .navbar-content {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .nav-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            justify-self: end;
+        }
+        
+        .nav-menu {
+            grid-column: 1 / -1;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            display: none;
+            padding-top: 8px;
+        }
+        
+        .nav-menu.open { 
+            display: flex; 
+        }
+        
+        .nav-menu li a,
+        .nav-menu .nav-link {
+            width: 100%;
+            display: block;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--glass-bg);
+        }
+        
+        .nav-link.active::after { 
+            display: none; 
         }
 
+        .logo { 
+            font-size: 24px; 
+            line-height: 1.2; 
+        }
+        
+        .logo i { 
+            margin-right: 8px; 
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-content {
+            width: 95%;
+            margin: 10% auto;
+            padding: 20px;
+        }
+
+        .container {
+            padding: 10px;
+        }
+
+        .glass-card {
+            padding: 20px;
+        }
+        
+        /* Dashboard mobile styles: */
+        .dashboard-actions {
+            gap: 4px;
+        }
+        
+        .dashboard-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        
+        .btn-text {
+            display: none;
+        }
+        
+        .dashboard-btn i {
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        /* SMS mobile styles: */
+        .btn-sms {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+        }
+        
+        .btn-sms i {
+            font-size: 12px !important;
+        }
+    }
+
         @media (max-width: 480px) {
-            .logo { font-size: 20px; }
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .table {
+                min-width: 700px; /* Prevent table from becoming too narrow */
+            }
+            
+            .due-payment-row td {
+                padding: 12px 8px;
+                white-space: nowrap;
+            }
+            
+            .client-name-container,
+            .phone-container,
+            .balance-container,
+            .due-date-container {
+                gap: 6px;
+            }
+            .logo { 
+                font-size: 20px; }
         }
         @media (max-width: 360px) {
             .logo { font-size: 18px; line-height: 1.1; }
@@ -548,78 +693,27 @@
             color: var(--text-primary);
             background: rgba(102, 126, 234, 0.1);
         }
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            color: white;
-            display: inline-block;
-        }
-
-        .status-overdue {
-            background: #f44336;
-        }
-
-        .status-due-today {
-            background: #ff9800;
-        }
-
-        .status-due-tomorrow {
-            background: #2196f3;
-        }
-
-        /* SMS Button Styles */
         .btn-sms {
-            background: linear-gradient(135deg, #4caf50, #45a049) !important;
+            background: linear-gradient(135deg, #25d366, #128c7e) !important;
             border: none !important;
             color: white !important;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .btn-sms:hover {
-            background: linear-gradient(135deg, #45a049, #3d8b40) !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-
-        .btn-sms:disabled {
-            background: #ccc !important;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        .btn-sms {
-            background: linear-gradient(135deg, #25d366, #128c7e);
-            border: none;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
         }
 
         .btn-sms:hover {
-            background: linear-gradient(135deg, #128c7e, #075e54);
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #128c7e, #075e54) !important;
             box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
         }
 
         .btn-sms:disabled {
-            background: #ccc;
+            background: #ccc !important;
             cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+            transform: none !important;
+            box-shadow: none !important;
         }
 
+        /* SMS button effects: */
         .btn-sms::before {
             content: '';
             position: absolute;
@@ -637,7 +731,7 @@
             opacity: 1;
         }
 
-        /* Loading animation for SMS */
+        /* SMS animations: */
         @keyframes smsLoading {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -647,11 +741,9 @@
             animation: smsLoading 1s infinite linear;
         }
 
-        /* Success state */
         .btn-sms.success {
             background: #4caf50 !important;
         }
-
         /* SMS notification styles */
         .sms-notification {
             border-left: 4px solid #25d366;
@@ -663,6 +755,23 @@
 
         /* Mobile responsive SMS buttons */
         @media (max-width: 768px) {
+             .dashboard-actions {
+                gap: 4px;
+            }
+
+            .dashboard-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+
+            .btn-text {
+                display: none;
+            }
+
+            .dashboard-btn i {
+                font-size: 12px;
+                margin: 0;
+            }
             .btn-sms {
                 padding: 6px 10px;
                 font-size: 12px;
@@ -672,12 +781,6 @@
                 font-size: 12px;
             }
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
         .notification-stat-card {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
@@ -686,6 +789,17 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
+        .table-responsive {
+            position: relative;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+                
     </style>
     {% block extra_css %}{% endblock %}
 </head>

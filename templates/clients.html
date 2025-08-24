@@ -39,18 +39,7 @@
         </div>
     </div>
 
-    <!-- Clients Table -->
-    <div class="glass-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-table"></i> Client Database
-            </h2>
-            <div style="color: var(--text-secondary);">
-                <span id="clientCount">{{ clients|length if clients else 0 }}</span> clients total
-            </div>
-        </div>
-
-        <div class="table-responsive" style="overflow-x: auto;">
+ <div class="table-responsive" style="overflow-x: auto;">
             <table class="table table-mobile" id="clientsTable">
                 <thead>
                     <tr>
@@ -66,114 +55,60 @@
                 <tbody>
                     {% if clients %}
                         {% for client in clients %}
-                        <tr data-client-id="{{ client.id }}" data-due-date="{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else '' }}" data-balance="{{ client.remaining_balance }}">
-                            <td data-label="Client">
-                                <div style="display: flex; align-items: center; gap: 15px;">
-                                    <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
-                                        {{ client.name[0].upper() if client.name else 'U' }}
+                        <tr
+                                    data-client-id="{{ client.id }}" 
+                                    data-balance="{{ client.remaining_balance }}" 
+                                    data-due-date="{{ client.due_date }}">
+     
+                            <td>
+                                <div class="client-info">
+                                    <h4>{{ client.name }}</h4>
+                                </div>
+                            </td>
+                            <td>
+                                {% if client.phone %}
+                                    <span class="phone-number">{{ client.phone }}</span>
+                                {% else %}
+                                    <span style="color: #999;">No phone</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <p>{{ client.products }}</p>
+                            </td>
+                            <td>
+                                <div>
+                                    <div class="total-amount">
+                                        <div>Total:  </div>
+                                        <div>P{{ "%.2f" | format(client.total_amount) }}</div>
                                     </div>
-                                    <div>
-                                        <div style="font-weight: 600; font-size: 16px;">{{ client.name }}</div>
-                                        <div style="color: var(--text-secondary); font-size: 12px;">Client ID: #{{ client.id }}</div>
-                                        <div style="color: var(--text-secondary); font-size: 12px;">Added: {{ client.created_at.strftime('%Y-%m-%d') if client.created_at else 'N/A' }}</div>
+                                    <div class="remaining-balance">
+                                        <div>Remaining:  </div>
+                                        <div>P{{ "%.2f" | format(client.remaining_balance) }}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td data-label="Contact Info">
-                                <div style="line-height: 1.6;">
-                                    {% if client.phone %}
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <i class="fas fa-phone" style="color: var(--text-secondary); width: 12px;"></i>
-                                        <span style="font-size: 14px;">{{ client.phone }}</span>
-                                    </div>
-                                    {% else %}
-                                    <div style="color: var(--text-secondary); font-size: 12px; font-style: italic;">No phone provided</div>
-                                    {% endif %}
-                                </div>
+                            <td>
+                                <div>{{ client.due_date if client.due_date else 'No due date' }}</div>
                             </td>
-                            <td data-label="Products/Items">
-                                <div style="max-width: 250px;">
-                                    <div style="font-weight: 500; margin-bottom: 5px;">Products/Items:</div>
-                                    <div style="background: var(--glass-bg); padding: 10px; border-radius: 8px; border-left: 3px solid var(--primary-gradient);">
-                                        <p style="margin: 0; font-size: 14px; line-height: 1.4;">{{ client.products }}</p>
-                                    </div>
-                                </div>
+                            <td class="client-status" data-balance="{{ client.remaining_balance }}" data-due-date="{{ client.due_date }}">
+                                <!-- Status will be populated by JavaScript -->
                             </td>
-                            <td data-label="Financial Summary">
-                                <div style="text-align: center;">
-                                    <div style="margin-bottom: 10px;">
-                                        <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 2px;">Total Amount</div>
-                                        <div style="font-weight: 600; font-size: 16px;">P{{ "%.2f"|format(client.total_amount) }}</div>
-                                    </div>
-                                    <div style="margin-bottom: 10px;">
-                                        <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 2px;">Outstanding</div>
-                                        <div class="amount-outstanding {% if client.remaining_balance > 0 %}amount-due{% else %}amount-paid{% endif %}">P{{ "%.2f"|format(client.remaining_balance) }}</div>
-                                    </div>
-                                    <div>
-                                        <div class="progress-outer">
-                                            {% set progress = ((client.total_amount - client.remaining_balance) / client.total_amount * 100) if client.total_amount > 0 else 100 %}
-                                            <div class="progress-inner {% if progress == 100 %}progress-complete{% else %}progress-active{% endif %}" data-progress="{{ "%.1f"|format(progress) }}"></div>
-                                        </div>
-                                        <div style="color: var(--text-secondary); font-size: 11px;">{{ "%.1f"|format(progress) }}% paid</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td data-label="Due Date">
-                                <div style="text-align: center;">
-                                    <div style="font-weight: 600; margin-bottom: 5px;">{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else 'N/A' }}</div>
-                                    <div style="color: var(--text-secondary); font-size: 12px;">
-                                        {% if client.due_date %}
-                                            {% if client.days_diff < 0 %}
-                                                {{ (-client.days_diff) }} days overdue
-                                            {% elif client.days_diff == 0 %}
-                                                Due today
-                                            {% elif client.days_diff == 1 %}
-                                                Due tomorrow
-                                            {% else %}
-                                                {{ client.days_diff }} days remaining
-                                            {% endif %}
-                                        {% else %}
-                                            No due date set
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </td>
-                            <td data-label="Status">
-                                <div class="client-status" data-due-date="{{ client.due_date.strftime('%Y-%m-%d') if client.due_date else '' }}" data-balance="{{ client.remaining_balance }}">
-                                    <!-- Status will be set by JavaScript -->
-                                </div>
-                            </td>
-                            <td data-label="Actions">
-                                <div class="action-row">
-                                    <button onclick="editClientFromButton(this)" class="btn btn-primary btn-compact" title="Edit Client">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    
-                                    {% if client.remaining_balance > 0 %}
-                                    <button onclick="sendReminderFromButton(this)" class="btn btn-warning-gradient btn-compact" title="Send Email Reminder">
-                                        <i class="fas fa-paper-plane"></i>
-                                    </button>
-                                    
-                                    <!-- Fixed SMS Button -->
-                                    {% if client.phone and client.phone.strip() != '' %}
-                                    <button onclick="sendSMSReminderFromButton(this)" class="btn btn-sms btn-compact" title="Send FREE SMS to {{ client.phone }}">
-                                        <i class="fas fa-sms"></i> SMS
-                                    </button>
-                                    {% else %}
-                                    <button disabled class="btn btn-disabled btn-compact" title="No phone number">
-                                        <i class="fas fa-phone-slash"></i> No SMS
-                                    </button>
-                                    {% endif %}
-                                    
-                                    <button onclick='markAsPaidFromButton(this)' class="btn btn-success btn-compact" title="Mark as Paid">
-                                        <i class="fas fa-check-circle"></i>
-                                    </button>
-                                    {% endif %}
-                                    
-                                    <button onclick='deleteClientFromButton(this)' class="btn btn-danger btn-compact" title="Delete Client">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
+                            <td>
+                                <button onclick="editClientFromButton(this)" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="sendReminderFromButton(this)" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                                <button onclick="sendSMSReminderFromButton(this)" class="btn btn-sm btn-sms">
+                                    <i class="fas fa-sms"></i>
+                                </button>
+                                <button onclick="markAsPaidFromButton(this)" class="btn btn-sm btn-success">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button onclick="deleteClientFromButton(this)" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -355,31 +290,54 @@
         }
     }
 
-    function validateForm(data, rules) {
-        const errors = [];
+function validateForm(data, rules) {
+    const errors = [];
+    
+    for (const [field, rule] of Object.entries(rules)) {
+        const value = data[field];
+        const label = rule.label || field;
         
-        for (const [field, rule] of Object.entries(rules)) {
-            const value = data[field];
-            const label = rule.label || field;
-            
-            if (rule.required && (!value || value.toString().trim() === '')) {
-                errors.push(`${label} is required`);
-                continue;
-            }
-            
-            if (value && rule.minLength && value.toString().length < rule.minLength) {
-                errors.push(`${label} must be at least ${rule.minLength} characters`);
-            }
-            
-            
-            if (value && rule.number && isNaN(value)) {
-                errors.push(`${label} must be a valid number`);
-            }
+        if (rule.required && (!value || value.toString().trim() === '')) {
+            errors.push(`${label} is required`);
+            continue;
         }
         
-        return errors;
+        if (value && rule.minLength && value.toString().length < rule.minLength) {
+            errors.push(`${label} must be at least ${rule.minLength} characters`);
+        }
+        
+        if (value && rule.maxLength && value.toString().length > rule.maxLength) {
+            errors.push(`${label} must not exceed ${rule.maxLength} characters`);
+        }
+        
+        if (value && rule.number && isNaN(parseFloat(value))) {
+            errors.push(`${label} must be a valid number`);
+        }
+        
+        if (value && rule.positive && parseFloat(value) < 0) {
+            errors.push(`${label} cannot be negative`);
+        }
+        
+        // Phone number validation for Philippine format
+        if (field === 'phone' && value && !validatePhoneNumber(value)) {
+            errors.push(`${label} must be a valid Philippine mobile number (09xxxxxxxxx)`);
+        }
     }
-
+    
+    return errors;
+}
+function validatePhoneNumber(phone) {
+    if (!phone || phone.trim() === '') return true; // Phone is optional
+    
+    const clean = phone.replace(/\D/g, '');
+    
+    // Philippine mobile number patterns
+    return (
+        (clean.length === 11 && clean.startsWith('09')) ||
+        (clean.length === 12 && clean.startsWith('639')) ||
+        (clean.length === 10 && clean.startsWith('9'))
+    );
+}
 
     // Modal functions
     function openModal(isEdit = false, clientData = null) {
@@ -443,54 +401,52 @@
     });
 
     // Form submission
-    document.getElementById('clientForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const button = e.target.querySelector('button[type="submit"]');
-        setLoadingState(button, true);
-        
+document.getElementById('clientForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const button = e.target.querySelector('button[type="submit"]');
+    setLoadingState(button, true);
+    
+    try {
         const formData = new FormData(e.target);
         const data = {
             name: formData.get('name').trim(),
             phone: formData.get('phone') ? formData.get('phone').trim() : '',
             products: formData.get('products').trim(),
-            total_amount: parseFloat(formData.get('total_amount')),
-            remaining_balance: parseFloat(formData.get('remaining_balance')),
-            due_date: formData.get('due_date')
+            total_amount: parseFloat(formData.get('total_amount')) || 0,
+            remaining_balance: parseFloat(formData.get('remaining_balance')) || 0,
+            due_date: formData.get('due_date') || ''
         };
 
-        // Validate form
+        console.log('Form data to submit:', data);
+
+        // Enhanced validation
         const errors = validateForm(data, {
-            name: { required: true, minLength: 2, label: 'Full Name' },
-            products: { required: true, minLength: 5, label: 'Products/Services' },
-            total_amount: { required: true, number: true, label: 'Total Amount' },
-            remaining_balance: { required: true, number: true, label: 'Remaining Balance' },
+            name: { required: true, minLength: 2, maxLength: 100, label: 'Full Name' },
+            phone: { maxLength: 20, label: 'Phone Number' },
+            products: { required: true, minLength: 1, maxLength: 500, label: 'Products/Services' },
+            total_amount: { required: true, number: true, positive: true, label: 'Total Amount' },
+            remaining_balance: { required: true, number: true, positive: true, label: 'Remaining Balance' },
             due_date: { required: true, label: 'Due Date' }
         });
 
-        // Additional validation
-        if (data.total_amount < 0) {
-            errors.push('Total amount cannot be negative');
-        }
-
-        if (data.remaining_balance < 0) {
-            errors.push('Remaining balance cannot be negative');
-        }
-
+        // Business logic validation
         if (data.remaining_balance > data.total_amount) {
             errors.push('Remaining balance cannot be greater than total amount');
         }
 
-        // Validate due date
-        const dueDate = new Date(data.due_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        if (dueDate < today) {
-            const confirmed = confirm('The due date is in the past. Are you sure you want to continue?');
-            if (!confirmed) {
-                setLoadingState(button, false);
-                return;
+        // Due date validation
+        if (data.due_date) {
+            const dueDate = new Date(data.due_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (dueDate < today) {
+                const confirmed = confirm('The due date is in the past. Are you sure you want to continue?');
+                if (!confirmed) {
+                    setLoadingState(button, false);
+                    return;
+                }
             }
         }
 
@@ -503,25 +459,34 @@
         const url = editingClientId ? `/update_client/${editingClientId}` : '/add_client';
         const method = editingClientId ? 'PUT' : 'POST';
         
+        console.log(`Sending ${method} request to ${url}`);
+        
         const result = await makeRequest(url, method, data);
         
+        console.log('Server response:', result);
+        
         if (result.success) {
-            showNotification(result.message || (editingClientId ? 'Client updated successfully!' : 'Client added successfully!'), 'success');
+            showNotification(
+                result.message || (editingClientId ? 'Client updated successfully!' : 'Client added successfully!'), 
+                'success'
+            );
             closeModal();
             
-            // Trigger notification check for new/updated clients
-            triggerNotificationCheck();
-            
+            // Refresh the page after a short delay to show updated data
             setTimeout(() => {
-                location.reload();
-            }, 1000);
-        }
-         else {
+                window.location.reload();
+            }, 1500);
+        } else {
             showNotification(result.message || 'An error occurred. Please try again.', 'error');
         }
         
+    } catch (error) {
+        console.error('Form submission error:', error);
+        showNotification('Network error occurred. Please check your connection and try again.', 'error');
+    } finally {
         setLoadingState(button, false);
-    });
+    }
+});
         // trigger notifications when client data changes
         async function triggerNotificationCheck() {
             try {
@@ -541,20 +506,34 @@
             
             try {
                 const cells = row.cells;
+                
+                // Extract data based on your HTML table structure
+                const nameCell = cells[0].querySelector('.client-info h4') || cells[0].querySelector('div');
+                const phoneSpan = cells[1].querySelector('span') || cells[1].querySelector('.phone-number');
+                const productsP = cells[2].querySelector('p') || cells[2];
+                
+                // Extract financial data (assuming it's in cells[3])
+                const totalAmountEl = cells[3].querySelector('[data-label*="Total"], .total-amount') || 
+                                    cells[3].querySelector('div:first-child div:last-child');
+                const remainingBalanceEl = cells[3].querySelector('[data-label*="Remaining"], .remaining-balance') || 
+                                        cells[3].querySelector('div:last-child div:last-child');
+                
                 const clientData = {
                     id: clientId,
-                    name: cells[0].querySelector('div > div > div').textContent.trim(),
-                    phone: (function() { const s = cells[1].querySelector('span'); return s ? s.textContent.trim() : ''; })(),
-                    products: cells[2].querySelector('p').textContent.trim(),
-                    total_amount: parseFloat(cells[3].querySelector('div:nth-child(1) > div:nth-child(2)').textContent.replace('$', '')),
-                    remaining_balance: parseFloat(cells[3].querySelector('div:nth-child(2) > div:nth-child(2)').textContent.replace('$', '')),
-                    due_date: row.dataset.dueDate
+                    name: nameCell ? nameCell.textContent.trim() : '',
+                    phone: phoneSpan ? phoneSpan.textContent.trim() : '',
+                    products: productsP ? productsP.textContent.trim() : '',
+                    total_amount: totalAmountEl ? parseFloat(totalAmountEl.textContent.replace(/[^\d.-]/g, '')) : 0,
+                    remaining_balance: remainingBalanceEl ? parseFloat(remainingBalanceEl.textContent.replace(/[^\d.-]/g, '')) : 0,
+                    due_date: row.dataset.dueDate || ''
                 };
                 
+                console.log('Extracted client data:', clientData);
                 openModal(true, clientData);
+                
             } catch (error) {
                 console.error('Error extracting client data:', error);
-                showNotification('Error loading client data', 'error');
+                showNotification('Error loading client data. Please try again.', 'error');
             }
         }
 
@@ -749,11 +728,11 @@ function updateClientStatuses() {
         } else if (daysDiff === 0) {
             statusHTML = '<span class="status-badge" style="background: #ff9800;"><i class="fas fa-clock"></i> Due Today</span>';
             pendingCount++;
-        } else if (daysDiff <= 7) {
-            statusHTML = '<span class="status-badge" style="background: #2196f3;"><i class="fas fa-calendar"></i> Due Soon</span>';
+        } else if (daysDiff <= 1) {
+            statusHTML = '<span class="status-badge" style="background: #2196f3;"><i class="fas fa-calendar"></i> Tomorrow</span>';
             pendingCount++;
         } else {
-            statusHTML = '<span class="status-badge" style="background: #4caf50;"><i class="fas fa-calendar-check"></i> Current</span>';
+            statusHTML = '<span class="status-badge" style="background: #4caf50;"><i class="fas fa-calendar-check"></i> Due Soon</span>';
             pendingCount++;
         }
         
@@ -768,21 +747,39 @@ function updateClientStatuses() {
 function updateChart(paidCount, pendingCount, overdueCount) {
     const totalClients = paidCount + pendingCount + overdueCount;
     
-    if (totalClients === 0) return;
+    if (totalClients === 0) {
+        // Handle empty state
+        const chartContainer = document.querySelector('.chart-container');
+        if (chartContainer) {
+            chartContainer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 200px; color: #666;">
+                    <div style="text-align: center;">
+                        <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                        <p>No client data available</p>
+                    </div>
+                </div>
+            `;
+        }
+        return;
+    }
     
     const paidPercentage = Math.round((paidCount / totalClients) * 100);
     const pendingPercentage = Math.round((pendingCount / totalClients) * 100);
     const overduePercentage = Math.round((overdueCount / totalClients) * 100);
     
-    // Update chart data elements if they exist
     const chartData = {
         paid: { count: paidCount, percentage: paidPercentage },
         pending: { count: pendingCount, percentage: pendingPercentage },
         overdue: { count: overdueCount, percentage: overduePercentage }
     };
     
-    // Update any chart elements in the DOM
+    console.log('Updated chart data:', chartData);
+    
+    // Update chart display elements
     updateChartDisplay(chartData);
+    
+    // Store in window for chart component if needed
+    window.chartData = chartData;
 }
 
 // Add this function to update chart display
@@ -1245,19 +1242,50 @@ function filterClients(filter) {
 
 // Utility function for API requests
 async function makeRequest(url, method = 'GET', data = null) {
-    const options = {
-        method,
-        headers: {
-            'Content-Type': 'application/json'
+    try {
+        const options = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        };
+        
+        if (data && (method === 'POST' || method === 'PUT')) {
+            options.body = JSON.stringify(data);
         }
-    };
-    
-    if (data) {
-        options.body = JSON.stringify(data);
+        
+        console.log(`Making ${method} request to ${url}`, data ? { data } : '');
+        
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Server returned invalid response format');
+        }
+        
+        const result = await response.json();
+        console.log(`Response from ${url}:`, result);
+        
+        return result;
+    } catch (error) {
+        console.error(`Request to ${url} failed:`, error);
+        
+        // Provide more specific error messages
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            return { success: false, message: 'Network connection failed. Please check your internet connection.' };
+        } else if (error.message.includes('HTTP 500')) {
+            return { success: false, message: 'Server error occurred. Please try again later.' };
+        } else if (error.message.includes('HTTP 404')) {
+            return { success: false, message: 'The requested resource was not found.' };
+        }
+        
+        return { success: false, message: `Error: ${error.message}` };
     }
-    
-    const response = await fetch(url, options);
-    return await response.json();
 }
 
 // Show notification function
@@ -1362,6 +1390,9 @@ if (!document.getElementById('sms-animations')) {
     `;
     document.head.appendChild(style);
 }
+
+window.chartData = {{ chart_data | tojson | safe }};
+
 </script>
 
 <style>
@@ -1657,13 +1688,22 @@ if (!document.getElementById('sms-animations')) {
     
     /* Table Responsive */
     .table-responsive {
-        font-size: 13px;
-        border-radius: 8px;
-        max-width: 100%;
+        position: relative;
+        width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    
+    #clientsTable {
+        width: 100%;
+        min-width: 900px; /* Prevent excessive shrinking */
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+        
     .table {
         min-width: 900px; /* Ensure table doesn't collapse too much */
     }
@@ -1816,99 +1856,319 @@ if (!document.getElementById('sms-animations')) {
     }
 }
 
-@media (max-width: 600px) {
-    .container {
-        padding: 12px 8px;
+@media (max-width: 480px) {
+    .table-responsive {
+        overflow-x: visible;
+        border-radius: 0;
+        background: transparent;
+        border: none;
+        backdrop-filter: none;
     }
-    
-    /* Header adjustments */
-    .header-section h1 {
-        font-size: 28px;
-    }
-    
-    .header-section p {
-        font-size: 15px;
-    }
-    
-    /* Glass card */
-    .glass-card {
-        padding: 14px;
-    }
-    
-    /* Search and filters stack vertically */
-    .data-filters {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .filter-btn {
+     #clientsTable {
+        min-width: 0;
         width: 100%;
-        padding: 12px;
-        font-size: 13px;
     }
     
-    /* Table becomes more compact */
-    .table {
+    /* Ensure mobile card layout works */
+    .table-mobile thead {
+        display: none !important;
+    }
+    .table-mobile {
+        border: none;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+        table-layout: fixed;
+    }
+    
+    .table-mobile thead {
+        display: none;
+    }
+    
+    .table-mobile,
+    .table-mobile tbody,
+    .table-mobile tr,
+    .table-mobile td {
+        display: block !important;
+        width: 100% !important;
+    }
+    
+    .client-row {
+        background: linear-gradient(135deg, 
+            rgba(13, 14, 33, 0.95) 0%, 
+            rgba(16, 17, 43, 0.98) 50%, 
+            rgba(13, 14, 33, 0.95) 100%);
+        border: 1px solid rgba(79, 172, 254, 0.2);
+        border-radius: 12px;
+        margin-bottom: 16px;
+        padding: 16px;
+        box-shadow: 
+            0 4px 16px rgba(0, 0, 0, 0.3),
+            0 2px 8px rgba(79, 172, 254, 0.1);
+        backdrop-filter: blur(20px);
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .client-row::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #4facfe, #00f2fe, #8a2be2);
+        border-radius: 16px 16px 0 0;
+    }
+    
+    .client-row td {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        padding: 8px 0;
+        border: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        text-align: left;
+        min-height: auto;
+        box-sizing: border-box;
+        overflow: hidden;
+        word-wrap: break-word;
+    }
+    
+    .client-row td:last-child {
+        border-bottom: none;
+        padding-top: 16px;
+    }
+    
+    .client-row td::before {
+        content: attr(data-label) ": ";
+        font-weight: 600;
+        color: #4facfe;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+        margin-bottom: 4px;
+        text-shadow: 0 0 8px rgba(79, 172, 254, 0.3);
+        width: 100%;
+    }
+    
+    .client-row td > * {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    /* Client name special styling */
+    .client-info h4 {
+        font-size: 16px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 15px rgba(79, 172, 254, 0.3);
+        margin: 0;
+        width: 100%;
+        word-wrap: break-word;
+    }
+    
+    /* Phone number styling */
+    .phone-number {
+        background: rgba(79, 172, 254, 0.1);
+        padding: 4px 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(79, 172, 254, 0.2);
         font-size: 12px;
-        min-width: 800px;
+        font-weight: 500;
+        color: #cbd5e1;
+        display: inline-block;
+        width: auto;
+        max-width: 100%;
+        word-wrap: break-word;
     }
     
-    .table th,
-    .table td {
-        padding: 8px 6px;
+    /* Products text */
+    .client-row td:nth-child(3) p {
+        margin: 0;
+        color: #cbd5e1;
+        font-size: 12px;
+        line-height: 1.4;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        max-width: 100%;
     }
     
-    /* Simplify client info display */
-    .client-info {
-        min-width: 160px;
+    /* Financial summary card layout */
+    .amount-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+        max-width: 100%;
     }
     
-    .client-avatar {
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
+    .total-amount,
+    .remaining-balance {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        width: 100%;
+        box-sizing: border-box;
     }
     
-    .client-name {
-        font-size: 13px;
+    .amount-label {
+        font-size: 10px;
+        color: #94a3b8;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
     }
     
-    /* Compact financial display */
-    .financial-summary {
-        min-width: 120px;
+    .amount-value {
+        font-size: 12px;
+        font-weight: 700;
+        color: #e2e8f0;
+        font-family: 'Courier New', monospace;
     }
     
-    .amount-display {
-        font-size: 13px;
+    .balance-highlight {
+        color: #00f5ff !important;
+        text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
     }
     
-    /* Action buttons become more compact */
-    .actions-column {
-        min-width: 120px;
+    /* Due date container */
+    .due-date-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(138, 43, 226, 0.1);
+        border-radius: 10px;
+        border: 1px solid rgba(138, 43, 226, 0.2);
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 500;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .due-date-container i {
+        color: #8a2be2;
+        font-size: 11px;
+        filter: drop-shadow(0 0 4px rgba(138, 43, 226, 0.5));
+        flex-shrink: 0;
+    }
+    
+    /* Status indicator */
+    .status-indicator {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        background: linear-gradient(135deg, rgba(79, 172, 254, 0.15), rgba(138, 43, 226, 0.1));
+        border: 1px solid rgba(79, 172, 254, 0.3);
+        color: #4facfe;
+        text-shadow: 0 0 8px rgba(79, 172, 254, 0.5);
+        width: 100%;
+        text-align: center;
+        box-sizing: border-box;
+    }
+    
+    /* Actions section */
+    .client-row td:last-child::before {
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        width: 100%;
+        margin-top: 8px;
     }
     
     .action-btn {
-        padding: 5px 6px;
-        font-size: 10px;
-        margin: 1px;
+        width: 100%;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 12px;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+        box-sizing: border-box;
     }
     
-    /* Modal becomes full-screen-like */
-    .modal-content {
-        margin: 10px;
-        width: calc(100% - 20px);
-        max-height: calc(100vh - 40px);
-        overflow-y: auto;
-        padding: 16px;
+    .action-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 
+            0 8px 25px rgba(0, 0, 0, 0.3),
+            0 0 20px var(--btn-glow);
     }
     
-    .modal-content h2 {
-        font-size: 20px;
-        margin-bottom: 16px;
+    .btn-primary {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(79, 172, 254, 0.3));
+        color: #4facfe;
+        border-color: rgba(79, 172, 254, 0.4);
+        --btn-glow: rgba(79, 172, 254, 0.4);
     }
-}
-
-@media (max-width: 480px) {
+    
+    .btn-warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.3));
+        color: #fbbf24;
+        border-color: rgba(245, 158, 11, 0.4);
+        --btn-glow: rgba(245, 158, 11, 0.4);
+    }
+    
+    .btn-sms {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.3));
+        color: #a855f7;
+        border-color: rgba(139, 92, 246, 0.4);
+        --btn-glow: rgba(139, 92, 246, 0.4);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 197, 94, 0.3));
+        color: #10b981;
+        border-color: rgba(16, 185, 129, 0.4);
+        --btn-glow: rgba(16, 185, 129, 0.4);
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.3));
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.4);
+        --btn-glow: rgba(239, 68, 68, 0.4);
+    }
+    
+    /* Action buttons grid - last two buttons span the full width */
+    .action-buttons .action-btn:nth-child(4) {
+        grid-column: 1 / 3;
+    }
+    
+    .action-buttons .action-btn:nth-child(5) {
+        grid-column: 3 / 6;
+    }
     .container {
         padding: 10px 6px;
     }
@@ -1926,6 +2186,7 @@ if (!document.getElementById('sms-animations')) {
     .header-section p {
         font-size: 14px;
     }
+    
     
     /* Glass cards more compact */
     .glass-card {
@@ -2041,8 +2302,107 @@ if (!document.getElementById('sms-animations')) {
     }
 }
 
+@media (min-width: 481px) {
+    .table-responsive {
+        overflow-x: auto;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .client-row td {
+        padding: 18px 12px;
+        vertical-align: middle;
+        border: none;
+        color: #e2e8f0;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        transition: all 0.3s ease;
+    }
+}
+
 /* Extra small devices (360px and below) */
 @media (max-width: 360px) {
+   .client-row {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+    }
+    
+    .client-row td {
+        padding: 6px 0;
+    }
+    
+    .client-row td::before {
+        font-size: 10px;
+        margin-bottom: 3px;
+    }
+    
+    .action-buttons {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 3px;
+    }
+    
+    .action-btn {
+        height: 32px;
+        font-size: 11px;
+        border-radius: 6px;
+    }
+    
+    .action-buttons .action-btn:nth-child(4) {
+        grid-column: 1 / 3;
+    }
+    
+    .action-buttons .action-btn:nth-child(5) {
+        grid-column: 3 / 4;
+    }
+    
+    .client-info h4 {
+        font-size: 14px;
+    }
+    
+    .amount-container {
+        gap: 4px;
+    }
+    
+    .total-amount,
+    .remaining-balance {
+        padding: 4px 8px;
+    }
+    
+    .amount-label {
+        font-size: 9px;
+    }
+    
+    .amount-value {
+        font-size: 11px;
+    }
+    
+    .due-date-container {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .status-indicator {
+        padding: 4px 8px;
+        font-size: 9px;
+    }
     .container {
         padding: 8px 4px;
     }
@@ -2756,5 +3116,496 @@ if (!document.getElementById('sms-animations')) {
     -moz-user-select: none;
     -ms-user-select: none;
 }
+/* Futuristic Aesthetic Table Rows */
+.client-row {
+    border: none;
+    border-bottom: 1px solid rgba(79, 172, 254, 0.1);
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    background: linear-gradient(135deg, 
+        rgba(13, 14, 33, 0.95) 0%, 
+        rgba(16, 17, 43, 0.98) 50%, 
+        rgba(13, 14, 33, 0.95) 100%);
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    margin-bottom: 2px;
+    border-radius: 12px;
+}
+
+.client-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent,
+        rgba(79, 172, 254, 0.05),
+        transparent);
+    transition: left 0.6s ease;
+    z-index: 1;
+}
+
+.client-row::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(79, 172, 254, 0.3), 
+        rgba(138, 43, 226, 0.3),
+        transparent);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.client-row:hover::before {
+    left: 100%;
+}
+
+.client-row:hover::after {
+    opacity: 1;
+}
+
+.client-row:hover {
+    background: linear-gradient(135deg, 
+        rgba(16, 17, 43, 0.98) 0%, 
+        rgba(22, 27, 61, 0.95) 50%, 
+        rgba(16, 17, 43, 0.98) 100%);
+    transform: translateY(-3px) scale(1.002);
+    box-shadow: 
+        0 15px 35px rgba(79, 172, 254, 0.15),
+        0 5px 15px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(79, 172, 254, 0.2);
+}
+
+.client-row:nth-child(even) {
+    background: linear-gradient(135deg, 
+        rgba(16, 17, 43, 0.92) 0%, 
+        rgba(13, 14, 33, 0.95) 50%, 
+        rgba(16, 17, 43, 0.92) 100%);
+}
+
+/* Enhanced cell styling */
+.client-row td {
+    padding: 18px 12px;
+    vertical-align: middle;
+    border: none;
+    position: relative;
+    z-index: 2;
+    color: #e2e8f0;
+}
+
+/* Futuristic client name */
+.client-name-cell {
+    min-width: 180px;
+}
+
+.client-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.4;
+    transition: all 0.4s ease;
+    text-shadow: 0 0 20px rgba(79, 172, 254, 0.3);
+    letter-spacing: 0.5px;
+}
+
+.client-row:hover .client-name {
+    background: linear-gradient(135deg, #00f2fe 0%, #8a2be2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transform: translateX(3px);
+    text-shadow: 0 0 25px rgba(79, 172, 254, 0.5);
+}
+
+/* Cyber phone styling */
+.phone-cell {
+    min-width: 140px;
+}
+
+.phone-number {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 16px;
+    background: rgba(79, 172, 254, 0.08);
+    border-radius: 25px;
+    border: 1px solid rgba(79, 172, 254, 0.2);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.phone-number:hover {
+    background: rgba(79, 172, 254, 0.15);
+    color: #4facfe;
+    box-shadow: 0 4px 15px rgba(79, 172, 254, 0.2);
+}
+
+.phone-number i {
+    color: #4facfe;
+    font-size: 12px;
+    filter: drop-shadow(0 0 5px rgba(79, 172, 254, 0.5));
+}
+
+.no-data {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #64748b;
+    font-size: 14px;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.no-data i {
+    color: #ef4444;
+    filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.3));
+}
+
+/* Products with glow */
+.products-cell {
+    min-width: 150px;
+}
+
+.products-text {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 160px;
+    word-wrap: break-word;
+    font-weight: 400;
+}
+
+/* Glowing amount display */
+.amount-cell {
+    min-width: 160px;
+}
+
+.amount-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.total-amount,
+.remaining-balance {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.amount-label {
+    color: #94a3b8;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+.amount-value {
+    font-weight: 700;
+    color: #e2e8f0;
+    font-family: 'Courier New', monospace;
+}
+
+.balance-highlight {
+    color: #00f5ff !important;
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(79, 172, 254, 0.1));
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 245, 255, 0.2);
+    text-shadow: 0 0 5px rgba(0, 245, 255, 0.5);
+}
+
+/* Holographic due date */
+.due-date-cell {
+    min-width: 150px;
+}
+
+.due-date-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #cbd5e1;
+    font-size: 14px;
+    padding: 8px 14px;
+    background: rgba(138, 43, 226, 0.08);
+    border-radius: 20px;
+    border: 1px solid rgba(138, 43, 226, 0.2);
+}
+
+.due-date-container i {
+    color: #8a2be2;
+    font-size: 12px;
+    filter: drop-shadow(0 0 5px rgba(138, 43, 226, 0.5));
+}
+
+/* Status with neon effect */
+.status-cell {
+    min-width: 120px;
+    text-align: center;
+}
+
+.status-indicator {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(138, 43, 226, 0.1));
+    border: 1px solid rgba(79, 172, 254, 0.3);
+    color: #4facfe;
+    text-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+    box-shadow: 0 0 15px rgba(79, 172, 254, 0.2);
+}
+
+/* Futuristic action buttons */
+.actions-cell {
+    min-width: 190px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    min-width: fit-content;
+}
+
+.table th,
+.table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.table th:nth-child(1),
+.table td:nth-child(1) {
+    min-width: 180px;
+}
+
+/* Contact info column */
+.table th:nth-child(2),
+.table td:nth-child(2) {
+    min-width: 140px;
+}
+
+/* Products column */
+.table th:nth-child(3),
+.table td:nth-child(3) {
+    min-width: 200px;
+    white-space: normal; /* Allow text wrapping for products */
+}
+
+/* Financial column */
+.table th:nth-child(4),
+.table td:nth-child(4) {
+    min-width: 160px;
+}
+
+/* Due date column */
+.table th:nth-child(5),
+.table td:nth-child(5) {
+    min-width: 150px;
+}
+
+/* Status column */
+.table th:nth-child(6),
+.table td:nth-child(6) {
+    min-width: 120px;
+}
+
+/* Actions column */
+.table th:nth-child(7),
+.table td:nth-child(7) {
+    min-width: 200px;
+}
+
+.action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+    transition: all 0.3s ease;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+}
+
+.action-btn:hover::before {
+    width: 80px;
+    height: 80px;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 
+        0 8px 25px rgba(0, 0, 0, 0.3),
+        0 0 20px var(--btn-glow);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(79, 172, 254, 0.3));
+    color: #4facfe;
+    border-color: rgba(79, 172, 254, 0.4);
+    --btn-glow: rgba(79, 172, 254, 0.4);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(79, 172, 254, 0.4));
+    color: #00f2fe;
+    text-shadow: 0 0 10px rgba(79, 172, 254, 0.8);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.3));
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+    --btn-glow: rgba(245, 158, 11, 0.4);
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(251, 191, 36, 0.4));
+    color: #fcd34d;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+}
+
+.btn-sms {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.3));
+    color: #a855f7;
+    border-color: rgba(139, 92, 246, 0.4);
+    --btn-glow: rgba(139, 92, 246, 0.4);
+}
+
+.btn-sms:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(168, 85, 247, 0.4));
+    color: #c084fc;
+    text-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 197, 94, 0.3));
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.4);
+    --btn-glow: rgba(16, 185, 129, 0.4);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(34, 197, 94, 0.4));
+    color: #34d399;
+    text-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.3));
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.4);
+    --btn-glow: rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(248, 113, 113, 0.4));
+    color: #f87171;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+/* Responsive futuristic design */
+@media (max-width: 768px) {
+    .client-row td {
+        padding: 18px 12px;
+    }
+    
+    .action-buttons {
+        gap: 4px;
+    }
+    
+    .action-btn {
+        width: 35px;
+        height: 35px;
+        font-size: 12px;
+    }
+}
+
+/* Special states */
+.client-row.loading {
+    opacity: 0.5;
+    pointer-events: none;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.7; }
+}
+
+.client-row.selected {
+    background: linear-gradient(135deg, 
+        rgba(79, 172, 254, 0.15) 0%, 
+        rgba(138, 43, 226, 0.1) 100%);
+    border: 1px solid rgba(79, 172, 254, 0.4);
+    box-shadow: 
+        0 0 25px rgba(79, 172, 254, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar styling for futuristic theme */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(13, 14, 33, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4facfe, #8a2be2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #00f2fe, #4facfe);
+}
+
 </style>
 {% endblock %}
