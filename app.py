@@ -28,10 +28,6 @@ DATABASE = os.getenv('DATABASE', 'debt_collection.db')
 BREVO_API_KEY = os.getenv('BREVO_API_KEY')
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
-@app.route("/")
-def home():
-    return "Hello, Render is working!"
-
 def get_db():
     """Get database connection"""
     if 'db' not in g:
@@ -562,7 +558,7 @@ Please settle ASAP. Thank you!"""
         })
 
 @app.route('/')
-def index():
+def home():
     if 'admin_id' in session:
         return redirect(url_for('dashboard'))
     return render_template('login.html')
