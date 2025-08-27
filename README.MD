@@ -1,305 +1,248 @@
 # Debt Collection System
 
-A comprehensive web-based debt collection management system built with Flask that helps businesses track outstanding payments, send automated reminders, and manage client information efficiently.
+A comprehensive web application for managing debt collection, client tracking, and automated payment reminders built with Flask and SQLite.
 
-## 🚀 Features
+## 🌐 Live Demo
+
+**Try the application:** [https://utang-collector.onrender.com](https://utang-collector.onrender.com)
+
+## 📋 Features
 
 ### Core Functionality
-- **Client Management**: Add, edit, update, and delete client information
-- **Payment Tracking**: Monitor total amounts, remaining balances, and payment history
-- **Due Date Management**: Track payment due dates with automatic status updates
+- **User Authentication**: Secure registration and login system with email verification
+- **Client Management**: Add, edit, delete, and track client information
+- **Payment Tracking**: Monitor total amounts, remaining balances, and due dates
 - **Dashboard Analytics**: Visual charts showing payment status distribution
-- **Real-time Notifications**: Automatic email notifications for due/overdue payments
+- **Due Date Monitoring**: Track overdue, due today, and upcoming payments
 
 ### Communication Features
-- **Email Notifications**: Automated email reminders using Brevo API
-- **SMS Reminders**: SMS notifications via email-to-SMS gateways for Philippine carriers (Smart, Globe, Sun)
-- **OTP Verification**: Secure email-based OTP for user registration
-- **Notification Logging**: Complete audit trail of all sent notifications
+- **Email Notifications**: Automated payment reminders via Brevo API
+- **SMS Gateway**: Send SMS reminders through email-to-SMS gateways for Philippine carriers (Smart, Globe, Sun)
+- **Bulk Notifications**: Send reminders to all eligible clients at once
+- **Automatic Alerts**: Real-time notifications for payment status changes
 
-### Security & Authentication
-- **User Registration**: Secure account creation with email verification
-- **Session Management**: Protected routes with login requirements
-- **Password Hashing**: Secure password storage using Werkzeug
-- **Environment Variables**: Secure configuration management
+### Analytics & Reporting
+- **Payment Status Charts**: Visual representation of paid, pending, and overdue accounts
+- **Recent Activity**: Track recently paid clients
+- **Due Payment Alerts**: Instant notifications for payments due today, tomorrow, or overdue
+- **Statistics Dashboard**: Overview of total clients, debt amounts, and outstanding balances
 
-## 🛠️ Technologies Used
+## 🛠️ Technology Stack
 
-- **Backend**: Flask (Python)
-- **Database**: MySQL with Flask-MySQLdb
-- **Email Service**: Brevo API (formerly SendinBlue)
-- **Security**: Werkzeug password hashing
-- **Frontend**: HTML, CSS, JavaScript (Bootstrap for styling)
-- **Environment**: python-dotenv for configuration
+- **Backend**: Python Flask
+- **Database**: SQLite
+- **Frontend**: HTML, CSS, JavaScript (with Chart.js for analytics)
+- **Email Service**: Brevo API
+- **SMS**: Email-to-SMS gateway integration
+- **Deployment**: Render
 
-## 📋 Prerequisites
+## 📦 Installation
 
+### Prerequisites
 - Python 3.7+
-- MySQL 5.7+ or MySQL 8.0+
-- SMTP email service (Brevo account recommended)
+- pip package manager
 
-## ⚙️ Installation
+### Setup Steps
 
-### 1. Clone the Repository
+1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone <your-repository-url>
 cd debt-collection-system
 ```
 
-### 2. Create Virtual Environment
+2. **Create virtual environment**
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Install Dependencies
+3. **Install dependencies**
 ```bash
-pip install flask flask-mysqldb werkzeug requests python-dotenv
+pip install flask werkzeug python-dotenv requests
 ```
 
-### 4. Database Setup
-
-Create a MySQL database and the following tables:
-
-```sql
--- Create database
-CREATE DATABASE debt_collection;
-USE debt_collection;
-
--- Admins table
-CREATE TABLE admins (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Clients table
-CREATE TABLE clients (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    admin_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
-    products TEXT,
-    total_amount DECIMAL(10,2) NOT NULL,
-    remaining_balance DECIMAL(10,2) NOT NULL,
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
-);
-
--- Notification log table
-CREATE TABLE notification_log (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    client_id INT NOT NULL,
-    notification_type VARCHAR(50) NOT NULL,
-    sent_to_admin BOOLEAN DEFAULT FALSE,
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-);
-
--- SMS reminders table
-CREATE TABLE sms_reminders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    client_id INT NOT NULL,
-    method VARCHAR(50) NOT NULL DEFAULT 'email_gateway',
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-);
-```
-
-### 5. Environment Configuration
-
+4. **Environment Configuration**
 Create a `.env` file in the root directory:
-
 ```env
-# Flask Configuration
-SECRET_KEY=your-super-secret-key-here
-
-# MySQL Database Configuration
-MYSQL_HOST=localhost
-MYSQL_USER=your_mysql_user
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_DB=debt_collection
-MYSQL_PORT=3306
-
-# Optional: For managed MySQL (like PlanetScale)
-# MYSQL_SSL_CA=/path/to/ca-certificate.crt
-
-# Brevo API Configuration
-BREVO_API_KEY=your-brevo-api-key-here
+SECRET_KEY=your-secret-key-here
+DATABASE=debt_collection.db
+BREVO_API_KEY=your-brevo-api-key
 ```
 
-### 6. Get Brevo API Key
-
-1. Sign up at [Brevo](https://www.brevo.com/) (formerly SendinBlue)
-2. Go to SMTP & API > API Keys
-3. Create a new API key
-4. Add it to your `.env` file
-
-## 🚀 Running the Application
-
-### Development Mode
+5. **Initialize Database**
 ```bash
 python app.py
 ```
+The database will be automatically created on first run.
 
-The application will be available at `http://localhost:5000`
-
-### Production Deployment
-
-For production deployment, consider using:
-- **Gunicorn** as WSGI server
-- **Nginx** as reverse proxy
-- **SSL certificate** for HTTPS
-- **Environment-specific configurations**
-
-Example with Gunicorn:
+6. **Run the application**
 ```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:8000 app:app
+python app.py
+```
+Access the application at `http://localhost:5000`
+
+## 🔧 Configuration
+
+### Email Setup (Brevo)
+1. Sign up for a free Brevo account at [brevo.com](https://brevo.com)
+2. Generate an API key from your account settings
+3. Add the API key to your `.env` file as `BREVO_API_KEY`
+
+### SMS Gateway Configuration
+The system supports Philippine mobile carriers:
+- **Smart**: Uses `@sms.smart.com.ph` and `@txt.smart.com.ph` gateways
+- **Globe**: Uses `@sms.globe.com.ph` and `@myglobe.sms.ph` gateways  
+- **Sun**: Uses `@sun.com.ph` gateway
+
+SMS functionality works through email-to-SMS gateways and is completely free.
+
+## 📱 Usage
+
+### Getting Started
+1. **Register**: Create an account with email verification
+2. **Login**: Access your dashboard
+3. **Add Clients**: Input client information, debt amounts, and due dates
+4. **Monitor**: Use the dashboard to track payment statuses
+5. **Send Reminders**: Use email or SMS reminders for overdue accounts
+
+### Client Management
+- Add new clients with contact information and payment details
+- Edit existing client information and payment amounts
+- Mark clients as fully paid when payments are received
+- Delete clients when necessary
+
+### Notification System
+- **Manual Reminders**: Send individual email or SMS reminders
+- **Bulk Notifications**: Send reminders to all eligible clients
+- **Automatic Alerts**: Receive email notifications for status changes
+
+## 📊 Dashboard Features
+
+### Analytics Charts
+- **Payment Status Distribution**: Pie chart showing paid, pending, and overdue percentages
+- **Due Payments**: List of clients with payments due today, tomorrow, or overdue
+- **Recent Activity**: Track recently paid clients
+
+### Key Metrics
+- Total number of clients
+- Total debt amount
+- Total outstanding balance
+- Number of due payments
+
+## 🔒 Security Features
+
+- **Password Hashing**: Secure password storage using Werkzeug
+- **Session Management**: Secure user sessions
+- **Input Validation**: Phone number and email validation
+- **SQL Injection Protection**: Parameterized queries
+- **CSRF Protection**: Session-based security
+
+## 📧 Notification System
+
+### Email Notifications
+- Beautiful HTML email templates
+- Automatic payment alerts
+- Status change notifications
+- OTP verification emails
+
+### SMS Integration
+- Philippine carrier support (Smart, Globe, Sun)
+- Automatic carrier detection
+- 160-character message optimization
+- Fallback carrier testing
+
+## 🚀 Deployment
+
+### Render Deployment
+1. Connect your GitHub repository to Render
+2. Set environment variables in Render dashboard
+3. Deploy with automatic builds
+
+### Environment Variables for Production
+```env
+SECRET_KEY=production-secret-key
+DATABASE=debt_collection.db
+BREVO_API_KEY=your-brevo-api-key
 ```
 
-## 📱 SMS Configuration (Philippine Carriers)
+## 🛡️ Database Schema
 
-The system supports SMS reminders via email-to-SMS gateways for Philippine mobile carriers:
+### Tables
+- **admins**: User accounts with authentication
+- **clients**: Client information and debt details
+- **sms_reminders**: SMS notification logs
 
-### Supported Carriers
-- **Smart**: `number@sms.smart.com.ph`, `number@txt.smart.com.ph`
-- **Globe**: `number@sms.globe.com.ph`, `number@myglobe.sms.ph`
-- **Sun**: `number@sun.com.ph`
+### Relationships
+- One admin can have many clients
+- One client can have many SMS reminder logs
 
-### Phone Number Formats
-The system accepts these Philippine mobile number formats:
-- `09xxxxxxxxx` (11 digits)
-- `639xxxxxxxxx` (12 digits)
-- `9xxxxxxxxx` (10 digits)
-
-## 📊 Usage Guide
-
-### 1. Registration & Login
-- Register with email verification (OTP-based)
-- Login with email and password
-- Secure session management
-
-### 2. Client Management
-- **Add Clients**: Include name, phone, products, amounts, and due dates
-- **Update Information**: Edit client details as needed
-- **Payment Tracking**: Monitor remaining balances
-- **Status Indicators**: Visual indicators for paid/pending/overdue status
-
-### 3. Notifications
-- **Automatic Emails**: System sends notifications when payments become due/overdue
-- **Manual SMS**: Send individual or bulk SMS reminders
-- **Notification History**: View all sent notifications
-
-### 4. Dashboard
-- **Overview Statistics**: Total clients, debt amounts, outstanding balances
-- **Visual Charts**: Payment status distribution
-- **Due Payments**: Quick view of upcoming and overdue payments
-- **Recent Activity**: Latest fully paid clients
-
-## 🔧 API Endpoints
+## 🔍 API Endpoints
 
 ### Authentication
-- `POST /register` - User registration
+- `POST /register` - User registration with email verification
 - `POST /verify_otp` - Email verification
 - `POST /login` - User login
 - `GET /logout` - User logout
 
 ### Client Management
-- `GET /clients` - List all clients
+- `GET /clients` - View all clients
 - `POST /add_client` - Add new client
-- `PUT /update_client/<id>` - Update client
+- `PUT /update_client/<id>` - Update client information
 - `DELETE /delete_client/<id>` - Delete client
 - `PUT /mark_as_paid/<id>` - Mark client as fully paid
 
 ### Notifications
-- `POST /send_sms_reminder/<id>` - Send SMS to specific client
-- `POST /send_all_sms_reminders` - Send SMS to all eligible clients
-- `GET /check_due_status_changes` - Check for status changes
-- `GET /get_notification_stats` - Get notification statistics
+- `POST /send_reminder/<id>` - Send email reminder
+- `POST /send_sms_reminder/<id>` - Send SMS reminder
+- `POST /send_all_sms_reminders` - Send bulk SMS reminders
 
-### Dashboard
-- `GET /dashboard` - Main dashboard
-- `GET /check_due_payments` - Get due payments
-- `GET /get_recent_paid_clients` - Get recently paid clients
-
-## 🛡️ Security Features
-
-- **Password Hashing**: All passwords are hashed using Werkzeug
-- **Session Protection**: Login required decorators for protected routes
-- **SQL Injection Prevention**: Parameterized queries throughout
-- **Environment Variables**: Sensitive data stored in environment variables
-- **Input Validation**: Phone number and email validation
-
-## 🔄 Automatic Notifications
-
-The system automatically sends email notifications for:
-- **Due Today**: Payments due on the current day
-- **Due Tomorrow**: Payments due the next day
-- **Overdue**: Payments past their due date
-
-Notifications include:
-- Client information
-- Payment details
-- Urgency indicators
-- Professional HTML formatting
-
-## 📞 Support
-
-For support with Philippine SMS gateways or general system issues:
-- Check carrier-specific gateway documentation
-- Verify phone number formats
-- Monitor notification logs for delivery status
-- Test with known working numbers first
-
-## 🚨 Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-**SMS not sending:**
-- Verify phone number format
-- Check carrier detection
-- Ensure Brevo API key is valid
-- Test with different carriers
+**SMS Not Sending**
+- Verify phone number format (Philippine numbers: 09XXXXXXXXX)
+- Check carrier detection for Smart, Globe, or Sun
+- Ensure Brevo API key is configured
 
-**Email notifications failing:**
-- Verify Brevo API key
-- Check internet connectivity
-- Review API usage limits
-- Validate email addresses
+**Email Notifications Failing**
+- Verify Brevo API key is valid
+- Check email format and sender configuration
+- Monitor Brevo API response logs
 
-**Database connection errors:**
-- Verify MySQL credentials
-- Check database permissions
-- Ensure database exists
-- Test connection manually
-
-**Session issues:**
-- Check SECRET_KEY configuration
-- Clear browser cookies
-- Verify session timeout settings
+**Database Issues**
+- Ensure SQLite file permissions are correct
+- Check database initialization on first run
+- Verify foreign key constraints
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is open source and available under the MIT License.
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## 📧 Contact
+## 📞 Support
 
-For questions or support, please contact the development team or create an issue in the repository.
+For support or questions about this debt collection system, please create an issue in the repository or contact the development team.
 
----
+## ⚡ Performance Notes
 
-**Note**: This system is designed for Philippine mobile carriers and uses specific email-to-SMS gateways. For international use, modify the carrier detection and gateway configuration accordingly.#   d e b t _ c o l l e c t o r  
- #   d e b t _ c o l l e c t o r  
- 
+- **Database**: SQLite is suitable for small to medium-scale deployments
+- **SMS Limits**: Email-to-SMS gateways may have carrier-specific limits
+- **Email Limits**: Brevo free tier includes generous sending limits
+- **Concurrent Users**: Flask development server is suitable for small teams
+
+## 🔮 Future Enhancements
+
+- Payment history tracking
+- Advanced reporting and analytics
+- Mobile app development
+- Integration with payment processors
+- Multi-language support
+- Advanced SMS provider integration
