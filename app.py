@@ -901,7 +901,7 @@ def add_client():
         data = request.get_json()
         
         db = get_db()
-        db.execute('''
+        cursor = db.execute('''
             INSERT INTO clients (admin_id, name, phone, products, total_amount, remaining_balance, due_date) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -913,12 +913,22 @@ def add_client():
             data['remaining_balance'],
             data['due_date']
         ))
+        
+        client_id = cursor.lastrowid
         db.commit()
+        
+        # Check if new client needs immediate notification
+        cursor = db.execute('SELECT * FROM clients WHERE id = ?', (client_id,))
+        new_client = cursor.fetchone()
+        
+        if new_client and should_notify_for_client(new_client):
+            trigger_payment_notifications(session['admin_id'])
         
         return jsonify({'success': True, 'message': 'Client added successfully!'})
     except Exception as e:
         print(f"Add client error: {e}")
         return jsonify({'success': False, 'message': 'Failed to add client!'})
+    
 
 @app.route('/update_client/<int:client_id>', methods=['PUT'])
 @login_required
@@ -927,6 +937,12 @@ def update_client(client_id):
         data = request.get_json()
         
         db = get_db()
+        
+        # Get old client data
+        cursor = db.execute('SELECT * FROM clients WHERE id = ? AND admin_id = ?', (client_id, session['admin_id']))
+        old_client = cursor.fetchone()
+        
+        # Update client
         db.execute('''
             UPDATE clients 
             SET name = ?, phone = ?, products = ?, 
@@ -944,10 +960,35 @@ def update_client(client_id):
         ))
         db.commit()
         
+        # Get updated client data
+        cursor = db.execute('SELECT * FROM clients WHERE id = ? AND admin_id = ?', (client_id, session['admin_id']))
+        updated_client = cursor.fetchone()
+        
+        # Check if update requires notification (due date changed or balance changed)
+        if (old_client and updated_client and 
+            (old_client['due_date'] != updated_client['due_date'] or 
+             old_client['remaining_balance'] != updated_client['remaining_balance'])):
+            
+            if should_notify_for_client(updated_client):
+                trigger_payment_notifications(session['admin_id'])
+        
         return jsonify({'success': True, 'message': 'Client updated successfully!'})
     except Exception as e:
         print(f"Update client error: {e}")
         return jsonify({'success': False, 'message': 'Failed to update client!'})
+    
+    
+@app.route('/check_daily_transitions', methods=['POST'])
+@login_required
+def check_daily_transitions():
+    """Check for clients whose status changed due to date transitions"""
+    try:
+        trigger_payment_notifications(session['admin_id'])
+        return jsonify({'success': True, 'message': 'Daily transition check completed'})
+    except Exception as e:
+        print(f"Daily transition check error: {e}")
+        return jsonify({'success': False, 'message': 'Failed to check daily transitions'})
+    
 
 @app.route('/delete_client/<int:client_id>', methods=['DELETE'])
 @login_required
@@ -1058,45 +1099,73 @@ def check_due_payments():
         print(f"Check due payments error: {e}")
         return jsonify({'notifications': []})
 
-def run_payment_notifications():
-    """Background task to automatically send payment notifications"""
-    def should_send_notifications():
-        """Check if current time matches notification schedule"""
-        current_hour = datetime.now().hour
-        return current_hour in [8, 14, 18]  # 8 AM, 2 PM, 6 PM
-    
-    def job():
-        try:
-            with app.app_context():
-                db = get_db()
-                cursor = db.execute('SELECT id, email FROM admins')
-                admins = cursor.fetchall()
-                
-                for admin in admins:
-                    notifications_sent = check_payment_status_for_admin(admin['id'], admin['email'])
-                    if notifications_sent > 0:
-                        print(f"✅ Sent {notifications_sent} automatic notifications to {admin['email']}")
-        except Exception as e:
-            print(f"❌ Automatic notification error: {e}")
-    
-    last_check_hour = -1
-    print("🔄 Automatic notification system running...")
-    
-    while True:
-        try:
-            current_hour = datetime.now().hour
+def check_and_send_instant_notifications(admin_id):
+    """Check for clients requiring immediate notification and send emails"""
+    try:
+        with app.app_context():
+            db = get_db()
             
-            # Only run once per hour at the scheduled times
-            if should_send_notifications() and current_hour != last_check_hour:
-                print(f"📧 Running automatic notification check at {datetime.now().strftime('%H:%M:%S')}")
-                job()
-                last_check_hour = current_hour
+            # Get admin email
+            cursor = db.execute('SELECT email FROM admins WHERE id = ?', (admin_id,))
+            admin = cursor.fetchone()
+            if not admin:
+                return 0
             
-            # Check every 10 minutes
-            time.sleep(600)
-        except Exception as e:
-            print(f"❌ Notification scheduler error: {e}")
-            time.sleep(600)  # Continue running even if there's an error
+            admin_email = admin['email']
+            
+            today = date.today()
+            tomorrow = today + timedelta(days=1)
+            yesterday = today - timedelta(days=1)
+            
+            # Get clients that need notifications
+            cursor = db.execute('''
+                SELECT * FROM clients 
+                WHERE admin_id = ? 
+                AND due_date IN (?, ?, ?) 
+                AND remaining_balance > 0
+            ''', (admin_id, yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
+            
+            due_clients = cursor.fetchall()
+            
+            notifications_sent = 0
+            for client in due_clients:
+                if send_automatic_payment_notification(client, admin_email):
+                    notifications_sent += 1
+                    time.sleep(1)
+            
+            if notifications_sent > 0:
+                print(f"Sent {notifications_sent} instant notifications to {admin_email}")
+            
+            return notifications_sent
+    except Exception as e:
+        print(f"Instant notification error: {e}")
+        return 0
+    
+def trigger_payment_notifications(admin_id):
+    """Trigger instant notifications for an admin"""
+    try:
+        notification_thread = Thread(target=check_and_send_instant_notifications, args=(admin_id,), daemon=True)
+        notification_thread.start()
+    except Exception as e:
+        print(f"Error triggering notifications: {e}")
+
+def should_notify_for_client(client):
+    """Check if a client requires immediate notification"""
+    if client['remaining_balance'] <= 0:
+        return False
+        
+    if not client['due_date']:
+        return False
+        
+    try:
+        today = date.today()
+        client_due_date = datetime.strptime(client['due_date'], '%Y-%m-%d').date()
+        days_diff = (client_due_date - today).days
+        
+        # Notify for: overdue, due today, due tomorrow
+        return days_diff in [-1, 0, 1] or days_diff < -1
+    except ValueError:
+        return False
 
 def check_payment_status_for_admin(admin_id, admin_email):
     """Check payment status for specific admin and send notifications"""
@@ -1310,11 +1379,9 @@ def check_due_status_changes():
 with app.app_context():
     init_db()
 
-# Initialize automatic notifications when app starts
-try:
-    start_notification_scheduler()
-except Exception as e:
-    print(f"Warning: Could not start automatic notifications: {e}")
+# Remove the old scheduled notification system
+print("Instant notification system ready - notifications will be sent when payment schedules are updated")
 
 if __name__ == '__main__':
     app.run(debug=True)
+
