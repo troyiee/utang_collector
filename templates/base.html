@@ -496,107 +496,140 @@
             color: #2196f3;
             border: 1px solid #2196f3;
         }
-
-      @media (max-width: 768px) {
-        .navbar-content {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-            gap: 10px;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        
-        .nav-toggle {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            justify-self: end;
-        }
-        
-        .nav-menu {
-            grid-column: 1 / -1;
-            flex-direction: column;
-            gap: 12px;
-            width: 100%;
-            display: none;
-            padding-top: 8px;
-        }
-        
-        .nav-menu.open { 
-            display: flex; 
-        }
-        
-        .nav-menu li a,
-        .nav-menu .nav-link {
-            width: 100%;
-            display: block;
-            padding: 10px 12px;
-            border-radius: 10px;
-            background: var(--glass-bg);
-        }
-        
-        .nav-link.active::after { 
-            display: none; 
-        }
-
-        .logo { 
-            font-size: 24px; 
-            line-height: 1.2; 
-        }
-        
-        .logo i { 
-            margin-right: 8px; 
-        }
-
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .modal-content {
-            width: 95%;
-            margin: 10% auto;
-            padding: 20px;
-        }
-
-        .container {
-            padding: 10px;
-        }
-
-        .glass-card {
-            padding: 20px;
-        }
-        
-        /* Dashboard mobile styles: */
-        .dashboard-actions {
-            gap: 4px;
-        }
-        
-        .dashboard-btn {
-            padding: 4px 8px;
-            font-size: 11px;
-        }
-        
-        .btn-text {
-            display: none;
-        }
-        
-        .dashboard-btn i {
-            font-size: 12px;
-            margin: 0;
-        }
-        
-        /* SMS mobile styles: */
-        .btn-sms {
-            padding: 6px 10px !important;
-            font-size: 12px !important;
-        }
-        
-        .btn-sms i {
-            font-size: 12px !important;
-        }
+@media (max-width: 768px) {
+    .navbar {
+        position: relative;
+        z-index: 1000;
     }
+    
+    .navbar-content {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+    
+    .nav-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        z-index: 1002;
+        position: relative;
+    }
+    
+    .nav-toggle:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: scale(1.05);
+    }
+    
+    .nav-menu {
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 20px;
+        right: 20px;
+        width: calc(100% - 40px);
+        flex-direction: column;
+        gap: 8px;
+        
+        /* Solid background */
+        background: linear-gradient(145deg, #1a1a3a 0%, #0f0f23 100%);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 15px;
+        padding: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        
+        /* Hidden by default */
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+        z-index: 1001;
+    }
+    
+    .nav-menu.open { 
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    
+    .nav-menu li {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .nav-menu li a,
+    .nav-menu .nav-link {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 15px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        font-size: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 500;
+    }
+    
+    .nav-menu li a:hover,
+    .nav-menu .nav-link:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.4);
+        transform: translateX(5px);
+        color: #ffffff;
+    }
+    
+    .nav-menu li a.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: rgba(102, 126, 234, 0.6);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    .nav-link.active::after { 
+        display: none; 
+    }
+
+    .logo { 
+        font-size: 22px; 
+        line-height: 1.2; 
+    }
+    
+    /* Ensure main content doesn't overlap */
+    main {
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Your existing styles... */
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@keyframes fadeOutUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
 
         @media (max-width: 480px) {
             .table-responsive {
@@ -780,6 +813,26 @@
             .btn-sms i {
                 font-size: 12px;
             }
+                .nav-toggle {
+                min-height: 44px;
+                min-width: 44px;
+                -webkit-tap-highlight-color: rgba(0,0,0,0);
+            }
+            
+            .nav-menu li a {
+                min-height: 44px;
+                -webkit-tap-highlight-color: rgba(102, 126, 234, 0.1);
+            }
+            
+            /* Prevent zoom on input focus */
+            .form-control {
+                font-size: 16px;
+            }
+            
+            /* Smooth scrolling on mobile */
+            html {
+                -webkit-overflow-scrolling: touch;
+            }
         }
         .notification-stat-card {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -808,7 +861,9 @@
     <nav class="navbar">
         <div class="navbar-content">
             <div class="logo">
-                <i class="fas fa-chart-line"></i><a href="{{ url_for('dashboard') }}"> DebtTrack Pro
+                <a href="{{ url_for('dashboard') }}" style="text-decoration: none; color: inherit;">
+                    <i class="fas fa-chart-line"></i> DebtTrack Pro
+                </a>
             </div>
             <button class="nav-toggle" aria-label="Toggle navigation">
                 <i class="fas fa-bars"></i>
@@ -951,23 +1006,48 @@
         document.documentElement.style.scrollBehavior = 'smooth';
 
         // Add loading animation to all buttons
-        document.addEventListener('DOMContentLoaded', function() {
-            const buttons = document.querySelectorAll('.btn');
-            buttons.forEach(btn => {
-                if (!btn.dataset.originalText) {
-                    btn.dataset.originalText = btn.textContent;
-                }
-            });
-
-            // Mobile nav toggle
-            const navToggle = document.querySelector('.nav-toggle');
-            const navMenu = document.querySelector('.nav-menu');
-            if (navToggle && navMenu) {
-                navToggle.addEventListener('click', function() {
-                    navMenu.classList.toggle('open');
-                });
+// Mobile nav toggle - REPLACE the existing toggle code in base.html
+document.addEventListener('DOMContentLoaded', function() {
+    const navToggle = document.querySelector('.nav-toggle');
+    const navMenu = document.querySelector('.nav-menu');
+    const navToggleIcon = navToggle?.querySelector('i');
+    
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            navMenu.classList.toggle('open');
+            
+            // Animate hamburger icon
+            if (navMenu.classList.contains('open')) {
+                navToggleIcon.classList.remove('fa-bars');
+                navToggleIcon.classList.add('fa-times');
+            } else {
+                navToggleIcon.classList.remove('fa-times');
+                navToggleIcon.classList.add('fa-bars');
             }
         });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!navToggle.contains(e.target) && !navMenu.contains(e.target) && navMenu.classList.contains('open')) {
+                navMenu.classList.remove('open');
+                navToggleIcon.classList.remove('fa-times');
+                navToggleIcon.classList.add('fa-bars');
+            }
+        });
+        
+        // Close menu when window is resized to desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768 && navMenu.classList.contains('open')) {
+                navMenu.classList.remove('open');
+                navToggleIcon.classList.remove('fa-times');
+                navToggleIcon.classList.add('fa-bars');
+            }
+        });
+    }
+});
     </script>
     
     {% block extra_js %}{% endblock %}
